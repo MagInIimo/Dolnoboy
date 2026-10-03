@@ -76,16 +76,16 @@ export class CameraRig {
       cam.up.set(0, 1, 0);
       cam.lookAt(tmp2);
       cam.rotateZ(-p.roll * 0.8);
-      if (cam.near !== 0.08) {
-        cam.near = 0.08;
+      if (cam.near !== 0.12) {
+        cam.near = 0.12;
         cam.fov = 68;
         cam.updateProjectionMatrix();
       }
       this.ready = true;
       return;
     }
-    if (cam.near !== 0.3) {
-      cam.near = 0.3;
+    if (cam.near !== 0.5) {
+      cam.near = 0.5;
       cam.fov = 62;
       cam.updateProjectionMatrix();
     }
@@ -172,8 +172,9 @@ export class Mirrors {
     this.frame = 0;
     this.targets = [new THREE.WebGLRenderTarget(256, 384), new THREE.WebGLRenderTarget(256, 384)];
     for (const t of this.targets) t.texture.colorSpace = THREE.LinearSRGBColorSpace;
-    this.cams = [new THREE.PerspectiveCamera(26, 256 / 384, 0.5, 900), new THREE.PerspectiveCamera(26, 256 / 384, 0.5, 900)];
-    this.mats = this.targets.map((t) => new THREE.MeshBasicMaterial({ map: t.texture }));
+    // short reach: what matters in a mirror is the road just behind; far objects are culled early
+    this.cams = [new THREE.PerspectiveCamera(26, 256 / 384, 0.5, 320), new THREE.PerspectiveCamera(26, 256 / 384, 0.5, 320)];
+    this.mats = this.targets.map((t) => new THREE.MeshBasicMaterial({ map: t.texture, side: THREE.DoubleSide }));
     for (const m of this.mats) m.map.wrapS = THREE.RepeatWrapping;
     for (const m of this.mats) {
       m.map.repeat.x = -1;
@@ -184,29 +185,38 @@ export class Mirrors {
 
   attach(model) {
     this.attached = model;
-    this.originals = [model.mirrorL.material, model.mirrorR.material];
+    this.originals = [model.mirrorL?.material, model.mirrorR?.material];
   }
 
   setActive(active) {
     const m = this.attached;
     if (!m) return;
-    m.mirrorL.material = active ? this.mats[0] : this.originals[0];
-    m.mirrorR.material = active ? this.mats[1] : this.originals[1];
+    if (active && !this.active) this.frame = 0;
+    if (m.mirrorL) m.mirrorL.material = active ? this.mats[0] : this.originals[0];
+    if (m.mirrorR) m.mirrorR.material = active ? this.mats[1] : this.originals[1];
     this.active = active;
   }
 
   render() {
     if (!this.active || !this.attached) return;
     this.frame++;
-    if (this.frame % this.every) return;
+    // first frame after entering the cab renders at once, then every N frames
+    if ((this.frame - 1) % this.every) return;
     const r = this.engine.renderer;
     const scene = this.engine.scene;
     const p = this.truck.physics;
     const m = this.attached;
     const prev = r.getRenderTarget();
     [m.mirrorL, m.mirrorR].forEach((mesh, i) => {
+      if (!mesh) return;
       const cam = this.cams[i];
-      mesh.getWorldPosition(cam.position);
+      // the glass may be offset inside its mesh: use the centre of its geometry
+      if (!mesh.userData.centre) {
+        mesh.geometry.computeBoundingBox();
+        mesh.userData.centre = mesh.geometry.boundingBox.getCenter(new THREE.Vector3());
+      }
+      cam.position.copy(mesh.userData.centre);
+      mesh.localToWorld(cam.position);
       const side = i === 0 ? -1 : 1;
       const back = p.yaw + Math.PI + side * -0.06;
       cam.lookAt(cam.position.x + Math.sin(back) * 10, cam.position.y - 0.9, cam.position.z + Math.cos(back) * 10);

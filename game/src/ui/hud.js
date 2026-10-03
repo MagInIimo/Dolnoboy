@@ -62,6 +62,7 @@ export class Hud {
       <button class="context" hidden></button>
       <div class="hint"></div>
       <div id="flash"></div>
+      <div class="busy panel" hidden><i></i><span></span></div>
     `;
     frame.appendChild(root);
     this.root = root;
@@ -98,6 +99,13 @@ export class Hud {
     this.notes.prepend(n);
     while (this.notes.children.length > 4) this.notes.lastChild.remove();
     setTimeout(() => n.remove(), 5200);
+  }
+
+  // Small centred notice while the game waits for the world (null hides it).
+  setBusy(text) {
+    const el = this.q('.busy');
+    el.hidden = !text;
+    if (text) el.querySelector('span').textContent = text;
   }
 
   flash() {

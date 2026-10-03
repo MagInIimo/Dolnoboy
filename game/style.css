@@ -220,3 +220,8 @@ pre.lic{white-space:pre-wrap;font-size:11px;line-height:1.4;color:var(--muted);m
   .gps canvas{height:150px}
   .dash .speed b{font-size:34px}
 }
+
+/* waiting for the world after a jump */
+.busy{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:12px;padding:14px 20px;font-size:15px;font-weight:600}
+.busy i{width:16px;height:16px;border-radius:50%;border:3px solid rgba(255,255,255,.2);border-top-color:var(--accent);animation:busy-spin .8s linear infinite}
+@keyframes busy-spin{to{transform:rotate(360deg)}}

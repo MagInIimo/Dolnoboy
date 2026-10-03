@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { buildTractor, drawGauges, vehicleMaterials } from './truck-model.js';
+import { buildTractorGlb, hasTractorAsset } from './truck-glb.js';
 import { buildTrailer } from './trailer-model.js';
 import { TruckPhysics } from './physics.js';
 import { TRAILERS, CARGO, COMPANIES, TRUCKS, PAINTS } from '../data/economy.js';
@@ -35,13 +36,17 @@ export class Truck {
     }
     this.fill = new THREE.PointLight(0xffe7c4, 0, 18, 2);
     this.group.add(this.fill);
+    this.steerTurn = new THREE.Quaternion();
+    this.zAxis = new THREE.Vector3(0, 0, 1);
   }
 
   setTruck(id, paintId, upgrades = {}) {
     if (this.model) this.group.remove(this.model.root);
     const spec = TRUCKS[id] ?? TRUCKS.sokol;
     const paint = PAINTS.find((p) => p.id === paintId) ?? PAINTS[0];
-    this.model = buildTractor({ cab: spec.cab, color: new THREE.Color(paint.color).getHex(), lightBar: (upgrades.lights ?? 0) > 0 });
+    const look = { cab: spec.cab, color: new THREE.Color(paint.color).getHex(), lightBar: (upgrades.lights ?? 0) > 0 };
+    this.model = hasTractorAsset() ? buildTractorGlb(look) : buildTractor(look);
+    this.windowsInside = null;
     this.group.add(this.model.root);
     this.model.root.traverse((o) => {
       if (o.isMesh) o.castShadow = true;
@@ -52,8 +57,17 @@ export class Truck {
     p.tank = [600, 900, 1200][upgrades.tank ?? 0];
     p.gripBonus = [0, 0.08, 0.16][upgrades.tyres ?? 0];
     this.spec = spec;
+    if (this.model.glb) {
+      p.wheelbase = this.model.wheelbase;
+      p.cabLength = 7.3;
+      p.cabCentre = 2.1;
+    } else {
+      p.wheelbase = 3.8;
+      p.cabLength = 7.2;
+      p.cabCentre = 1.6;
+    }
     for (const spot of this.headlights) {
-      spot.position.set(spot.userData.side * 0.85, 0.95, this.model.cabFront + 0.3);
+      spot.position.set(spot.userData.side * 0.85, this.model.lampY ?? 0.95, this.model.cabFront + 0.3);
       spot.target.position.set(spot.userData.side * 1.5, -1.2, this.model.cabFront + 40);
     }
     this.fill.position.set(0, 1.4, this.model.cabFront + 3);
@@ -99,11 +113,23 @@ export class Truck {
     this.group.rotation.z = p.roll;
     m.body.rotation.x = -clampAbs(p.accel * 0.006, 0.03);
     m.body.rotation.z = clampAbs(p.latAccel * 0.006, 0.035);
-    for (const w of m.wheels) w.children.forEach((c) => (c.rotation.x = (w.position.x < 0 ? -1 : 1) * p.wheelSpin));
-    for (const w of m.frontWheels) w.rotation.y = (w.position.x < 0 ? Math.PI : 0) + p.steerAngle;
+    if (m.glb) {
+      for (const w of m.wheels) for (const c of w.children) c.rotation.x = p.wheelSpin;
+      for (const w of m.frontWheels) w.rotation.y = p.steerAngle;
+      if (m.steering) m.steering.quaternion.copy(m.steeringBase).multiply(this.steerTurn.setFromAxisAngle(this.zAxis, -p.steerAngle * 9));
+    } else {
+      for (const w of m.wheels) w.children.forEach((c) => (c.rotation.x = (w.position.x < 0 ? -1 : 1) * p.wheelSpin));
+      for (const w of m.frontWheels) w.rotation.y = (w.position.x < 0 ? Math.PI : 0) + p.steerAngle;
+    }
+    if (m.windows && this.windowsInside !== interiorView) {
+      this.windowsInside = interiorView;
+      const inside = m.glassInside ?? this.mats.glassInside;
+      const outside = m.glassOutside ?? this.mats.glassDark;
+      for (const w of m.windows) w.material = interiorView ? inside : outside;
+    }
     if (m.interior) {
       m.interior.group.visible = interiorView;
-      m.interior.wheel.rotation.z = -p.steerAngle * 9;
+      if (m.interior.wheel) m.interior.wheel.rotation.z = -p.steerAngle * 9;
       this.gaugeTimer = (this.gaugeTimer ?? 0) - dt;
       if (interiorView && this.gaugeTimer <= 0) {
         this.gaugeTimer = 0.08;
@@ -126,11 +152,23 @@ export class Truck {
     const blinkOn = this.blink % 0.8 < 0.42;
     const left = (this.indicator < 0 || this.hazard) && blinkOn;
     const right = (this.indicator > 0 || this.hazard) && blinkOn;
-    this.mats.indicator.emissiveIntensity = left ? 2.4 : 0;
-    this.mats.indicatorR.emissiveIntensity = right ? 2.4 : 0;
     const on = this.lightsOn;
-    this.mats.headlight.emissiveIntensity = on ? (this.highBeam ? 3.2 : 2.2) : 0.05;
-    this.mats.tail.emissiveIntensity = p.braking > 0.1 ? 3 : on ? 1.1 : 0.15;
+    if (m.lamps) {
+      const set = (list, k) => {
+        for (const mat of list) mat.emissiveIntensity = k;
+      };
+      set(m.lamps.left, left ? 3 : 0);
+      set(m.lamps.right, right ? 3 : 0);
+      set(m.lamps.head, on ? (this.highBeam ? 3.4 : 2.4) : 0.04);
+      set(m.lamps.tail, p.braking > 0.1 ? 3.2 : on ? 1.2 : 0.1);
+      set(m.lamps.reverse, p.direction < 0 ? 2.4 : 0);
+      set(m.lamps.marker, on ? 1.4 : 0);
+    } else {
+      this.mats.indicator.emissiveIntensity = left ? 2.4 : 0;
+      this.mats.indicatorR.emissiveIntensity = right ? 2.4 : 0;
+      this.mats.headlight.emissiveIntensity = on ? (this.highBeam ? 3.2 : 2.2) : 0.05;
+      this.mats.tail.emissiveIntensity = p.braking > 0.1 ? 3 : on ? 1.1 : 0.15;
+    }
     for (const spot of this.headlights) {
       spot.intensity = on ? (this.highBeam ? 260 : 140) * (0.35 + nightFactor * 0.65) : 0;
       spot.distance = this.highBeam ? 190 : 110;

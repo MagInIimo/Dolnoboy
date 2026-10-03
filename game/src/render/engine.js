@@ -6,8 +6,8 @@ import { noiseCanvas } from './textures.js';
 import { damp } from '../core/util.js';
 
 export const QUALITY = {
-  low: { pixelRatio: 0.8, shadows: 0, viewRadius: 1100, texture: 256, trees: 0.45, antialias: false, mirrors: 3, grass: false },
-  medium: { pixelRatio: 1, shadows: 1024, viewRadius: 1500, texture: 512, trees: 0.75, antialias: true, mirrors: 2, grass: true },
+  low: { pixelRatio: 0.8, shadows: 0, viewRadius: 1100, texture: 256, trees: 0.45, antialias: false, mirrors: 4, grass: false },
+  medium: { pixelRatio: 1, shadows: 1024, viewRadius: 1500, texture: 512, trees: 0.75, antialias: true, mirrors: 3, grass: true },
   high: { pixelRatio: 1.5, shadows: 2048, viewRadius: 1900, texture: 512, trees: 1, antialias: true, mirrors: 1, grass: true },
 };
 
@@ -28,7 +28,7 @@ export class Engine {
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.Fog(0xb8c8d6, 60, 1800);
     this.fogFarTarget = 1800;
-    this.camera = new THREE.PerspectiveCamera(62, 1, 0.15, 4200);
+    this.camera = new THREE.PerspectiveCamera(62, 1, 0.15, 9500);
     this.scene.add(this.camera);
     this.sun = new THREE.DirectionalLight(0xffffff, 3);
     this.sun.castShadow = this.quality.shadows > 0;
@@ -75,10 +75,10 @@ export class Engine {
     const normal = new THREE.CanvasTexture(c);
     normal.wrapS = normal.wrapT = THREE.RepeatWrapping;
     normal.colorSpace = THREE.NoColorSpace;
-    normal.repeat.set(160, 160);
+    normal.repeat.set(390, 390);
     this.waterNormal = normal;
     const mat = new THREE.MeshStandardMaterial({ color: 0x24404c, roughness: 0.08, metalness: 0.15, normalMap: normal, normalScale: new THREE.Vector2(0.35, 0.35), transparent: true, opacity: 0.9 });
-    this.water = new THREE.Mesh(new THREE.PlaneGeometry(9000, 9000), mat);
+    this.water = new THREE.Mesh(new THREE.PlaneGeometry(22000, 22000), mat);
     this.water.rotation.x = -Math.PI / 2;
     this.water.position.y = WATER_LEVEL;
     this.water.renderOrder = 2;

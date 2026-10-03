@@ -99,13 +99,16 @@ export class World {
     const natural = this.baseHeight(x, z, guard);
     let h = natural;
     let bestW = 0;
+    let bestD = Infinity;
     let target = 0;
     for (let k = 0; k < near.n; k++) {
       const flat = near.o[k] + 1.5;
       const blend = clamp(6 + Math.abs(near.y[k] - natural) * 1.7, 6, 44);
       const w = 1 - smoothstep(flat, flat + blend, near.d[k]);
-      if (w > bestW) {
+      // several segments are fully "flat" across the road width: the nearest one carries the true height
+      if (w > bestW + 1e-6 || (w > bestW - 1e-6 && near.d[k] < bestD)) {
         bestW = w;
+        bestD = near.d[k];
         target = near.y[k] - 0.12;
       }
     }

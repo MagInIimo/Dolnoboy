@@ -5,6 +5,7 @@ import { WorldView } from '../render/world-view.js';
 import { BuildingLayer, buildingMaterial, facadeArray } from '../render/building-layer.js';
 import { TreeSystem } from '../render/trees.js';
 import { Truck } from '../vehicle/truck.js';
+import { loadTractorAsset } from '../vehicle/truck-glb.js';
 import { buildTrailer } from '../vehicle/trailer-model.js';
 import { CameraRig, Mirrors } from '../render/camera-rig.js';
 import { Input } from '../core/input.js';
@@ -23,6 +24,7 @@ import { angleDiff, clamp, formatMoney, rng } from '../core/util.js';
 import { Traffic } from '../traffic/traffic.js';
 import { Props } from '../render/props.js';
 import { Rain } from '../render/rain.js';
+import { Horizon } from '../render/horizon.js';
 
 const STEP = 1 / 60;
 
@@ -50,7 +52,7 @@ export class Game {
     const engine = new Engine(this.frame, s.settings.quality);
     this.engine = engine;
     L.stage('loadingTextures', 0.35);
-    const photos = await loadPhotoTextures((p) => L.stage('loadingTextures', 0.35 + p * 0.15));
+    const [photos] = await Promise.all([loadPhotoTextures((p) => L.stage('loadingTextures', 0.35 + p * 0.15)), loadTractorAsset()]);
     const texSize = engine.quality.texture;
     this.surfaces = new SurfaceMaterials(buildSurfaceArrays(photos, texSize), macroNoiseTexture(), s.settings.quality);
     engine.attachSurfaces(this.surfaces);
@@ -60,7 +62,7 @@ export class Game {
     this.buildings = new BuildingLayer(world, this.buildingMat, this.surfaces.road, this.surfaces.roadOverlay, engine.scene, engine.quality);
     L.stage('loadingTrees', 0.62);
     await L.frame();
-    this.trees = new TreeSystem(engine, world, engine.quality);
+    this.trees = new TreeSystem(engine, world, engine.quality, photos);
     this.props = new Props(engine, world, engine.quality, this.lang);
     this.view = new WorldView(engine, world, this.surfaces, [this.buildings, this.trees, this.props]);
     this.truck = new Truck(engine, world);
@@ -69,6 +71,7 @@ export class Game {
     this.mirrors = new Mirrors(engine, this.truck, engine.quality.mirrors);
     this.mirrors.attach(this.truck.model);
     this.rain = new Rain(engine, engine.quality);
+    this.horizon = new Horizon(engine, world, this.surfaces, engine.quality.viewRadius);
     this.distances = cityDistances(world);
     this.jobs = new JobMarket(world, this.distances);
     this.nav = new Navigator(world);
@@ -99,6 +102,7 @@ export class Game {
     engine.update(0.016, focus);
     // only the surroundings must be ready; the horizon keeps streaming in while driving
     let first = 0;
+    this.horizon.update(focus, 99);
     for (let i = 0; i < 2000; i++) {
       this.view.update(focus, 30);
       this.trees.update(1, focus);
@@ -324,9 +328,62 @@ export class Game {
     this.setNavTarget({ x: node.x, z: node.z });
   }
 
+  // Places the rig for previews and automated checks: {hw: 'moscow-vladimir', s} or {city: 'kazan', ring, angle}, plus hour/weather.
+  previewAt(opts = {}) {
+    const p = this.truck.physics;
+    const net = this.world.net;
+    let pt = null;
+    if (opts.hw) {
+      const [a, b] = opts.hw.split('-');
+      const hw = this.world.highways.find((h) => h.A.id === a && h.B.id === b);
+      if (hw) pt = net.pointAt(hw.edge, Math.min(hw.edge.len - 50, opts.s ?? hw.edge.len / 2), hw.edge.type.carriageHalf - hw.edge.type.laneWidth / 2);
+    } else if (opts.city) {
+      const c = this.world.cities.find((q) => q.id === opts.city);
+      const ring = c?.plan.edges.filter((e) => e.alive && e.role === (opts.role ?? 'radial'));
+      const e = ring?.[Math.floor((opts.pick ?? 0.5) * ring.length) % ring.length];
+      if (e) pt = net.pointAt(e, e.len * (opts.t ?? 0.5), e.type.carriageHalf - e.type.laneWidth / 2);
+    }
+    if (pt) {
+      if (p.trailer) this.truck.detachTrailer();
+      p.place(pt.x, pt.z, opts.reverse ? pt.heading + Math.PI : pt.heading);
+      p.parking = false;
+      this.rig.ready = false;
+    }
+    if (opts.hour !== undefined) this.state.time = Math.floor(this.state.time / 1440) * 1440 + opts.hour * 60;
+    if (opts.weather) {
+      this.state.weather = opts.weather;
+      this.state.weatherUntil = this.state.time + 600;
+      this.engine.env.setWeather(opts.weather);
+      Object.assign(this.engine.env.weatherBlend, WEATHERS[opts.weather]);
+    }
+    if (pt && opts.settle !== false) return this.settle().then(() => ({ x: Math.round(pt.x), z: Math.round(pt.z) }));
+    return pt ? { x: Math.round(pt.x), z: Math.round(pt.z) } : null;
+  }
+
+  // After a jump (tow truck, preview) the surroundings are built before play resumes.
+  async settle(dist = 600) {
+    this.settling = true;
+    this.updateRunning();
+    this.hud.setBusy(this.t('loadingArea'));
+    const p = this.truck.physics;
+    const focus = new THREE.Vector3(p.x, p.y, p.z);
+    this.horizon.update(focus, 99);
+    const t0 = performance.now();
+    while (performance.now() - t0 < 25000) {
+      this.view.update(focus, 40);
+      this.trees.update(1, focus);
+      if (this.view.pendingWithin(dist) === 0) break;
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    this.hud.setBusy(null);
+    this.settling = false;
+    this.rig.ready = false;
+    this.updateRunning();
+  }
+
   // ---------- running state ----------
   updateRunning() {
-    const running = !this.menus?.open && this.platform.pauses.size === 0 && !this.hidden && !this.focusLost;
+    const running = !this.menus?.open && this.platform.pauses.size === 0 && !this.hidden && !this.focusLost && !this.settling;
     this.running = running;
     this.platform.gameplay(running);
     this.sound?.setActive(running && this.state.settings.sound);
@@ -834,6 +891,7 @@ export class Game {
     if (keepTrailer) p.trailerYaw = lot.heading;
     this.rig.ready = false;
     this.nav.recalc(p.x, p.z, p.yaw);
+    await this.settle();
     this.hud.notify(this.t('towed'));
     this.save(true);
   }
@@ -1021,6 +1079,7 @@ export class Game {
       this.engine.update(this.running ? dt : 0, focus);
       this.buildingMat.userData.shader && (this.buildingMat.userData.shader.uniforms.uNight.value = night * 0.95 + (this.engine.env.weatherBlend.overcast > 0.8 ? 0.15 : 0));
       this.view.update(focus, this.running ? 4 : 8);
+      this.horizon.update(focus);
       this.trees.update(dt, this.engine.camera.position);
       this.buildings.update(this.engine.camera.position);
       this.props.update(dt, this.engine.camera.position, night);

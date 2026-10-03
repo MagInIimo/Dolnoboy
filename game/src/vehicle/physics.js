@@ -89,6 +89,10 @@ export class TruckPhysics {
     this.accel = 0;
     this.latAccel = 0;
     this.fuelRate = 0;
+    // front axle ahead of the rear (tandem) reference point; the tractor model may override it
+    this.wheelbase = WHEELBASE;
+    this.cabLength = 7.2;
+    this.cabCentre = 1.6;
   }
 
   get mass() {
@@ -218,11 +222,11 @@ export class TruckPhysics {
     const rz = fx;
     const refY = this.lastGroundY;
     const gR = W.groundAt(this.x, this.z, refY);
-    const gF = W.groundAt(this.x + fx * WHEELBASE, this.z + fz * WHEELBASE, refY);
+    const gF = W.groundAt(this.x + fx * this.wheelbase, this.z + fz * this.wheelbase, refY);
     const gL = W.groundAt(this.x + fx * 2 + rx * -1.1, this.z + fz * 2 + rz * -1.1, refY);
     const gRt = W.groundAt(this.x + fx * 2 + rx * 1.1, this.z + fz * 2 + rz * 1.1, refY);
     this.groundSurface = gR.surface;
-    const pitchTarget = Math.atan2(gF.y - gR.y, WHEELBASE);
+    const pitchTarget = Math.atan2(gF.y - gR.y, this.wheelbase);
     const rollTarget = Math.atan2(gRt.y - gL.y, 2.2);
     this.pitch = lerp(this.pitch, pitchTarget, clamp(dt * 10, 0, 1));
     this.roll = lerp(this.roll, rollTarget, clamp(dt * 8, 0, 1));
@@ -285,7 +289,7 @@ export class TruckPhysics {
     const rate = input.steerRate ?? 1.6;
     this.steerAngle += clamp(target - this.steerAngle, -rate * dt, rate * dt);
     // yaw from the kinematic bicycle model, saturated by lateral grip
-    let yawRate = (this.v * Math.tan(this.steerAngle)) / WHEELBASE;
+    let yawRate = (this.v * Math.tan(this.steerAngle)) / this.wheelbase;
     const latLimit = grip * G * 0.95;
     const lat = Math.abs(this.v * yawRate);
     this.slip = 0;
@@ -345,7 +349,7 @@ export class TruckPhysics {
   boxes() {
     const fx = Math.sin(this.yaw);
     const fz = Math.cos(this.yaw);
-    const list = [{ part: 'tractor', x: this.x + fx * 1.6, z: this.z + fz * 1.6, w: 2.5, d: 7.2, h: this.yaw }];
+    const list = [{ part: 'tractor', x: this.x + fx * this.cabCentre, z: this.z + fz * this.cabCentre, w: 2.5, d: this.cabLength, h: this.yaw }];
     if (this.trailer) {
       const hp = this.hitchPos();
       const tfx = Math.sin(this.trailerYaw);

@@ -14,18 +14,24 @@ const FILES = {
   dry: ['assets/withered_grass/withered_grass_diff_1k.jpg', 'assets/withered_grass/withered_grass_nor_gl_1k.jpg'],
   brick: ['assets/brick_wall_001/brick_wall_001_diffuse_1k.jpg', 'assets/brick_wall_001/brick_wall_001_nor_gl_1k.jpg'],
   plaster: ['assets/plastered_wall/plastered_wall_diff_1k.jpg', 'assets/plastered_wall/plastered_wall_nor_gl_1k.jpg'],
+  // project photo textures (no normal map)
+  lawn: ['assets/photo/grass-ground.jpg'],
+  asphaltFine: ['assets/photo/asphalt-fine.jpg'],
+  foliage: ['assets/photo/foliage.webp'],
+  spruce: ['assets/photo/spruce-bough.webp'],
+  tuft: ['assets/photo/grass-tuft.webp'],
 };
 
 export async function loadPhotoTextures(onProgress) {
   const entries = Object.entries(FILES);
   const out = {};
   let done = 0;
-  const total = entries.length * 2;
+  const total = entries.reduce((n, [, files]) => n + files.length, 0);
   await Promise.all(
     entries.map(async ([key, [diff, nor]]) => {
-      const [d, n] = await Promise.all([loadImage(diff), loadImage(nor)]);
+      const [d, n] = await Promise.all([loadImage(diff), nor ? loadImage(nor) : null]);
       out[key] = { diff: d, nor: n };
-      done += 2;
+      done += nor ? 2 : 1;
       onProgress?.(done / total);
     })
   );
@@ -33,11 +39,11 @@ export async function loadPhotoTextures(onProgress) {
 }
 
 export function buildSurfaceArrays(photos, size) {
-  const asphalt = imageToCanvas(photos.asphalt.diff, size, 'brightness(0.92) contrast(1.05) saturate(0.7)');
+  const asphalt = imageToCanvas(photos.asphaltFine.diff, size, 'brightness(0.8) contrast(1.1) saturate(0.6)');
   const shoulder = imageToCanvas(photos.asphalt.diff, size, 'brightness(1.12) contrast(0.9) saturate(0.55)');
   const concrete = imageToCanvas(photos.concrete.diff, size, 'brightness(1.05) saturate(0.6)');
   const gravel = imageToCanvas(photos.gravel.diff, size, 'saturate(0.75)');
-  const grass = grassCanvas(size, imageToCanvas(photos.grass.diff, size));
+  const grass = imageToCanvas(photos.lawn.diff, size, 'brightness(0.86) saturate(0.88)');
   const dry = imageToCanvas(photos.dry.diff, size);
   const paving = pavingCanvas(size);
   const soil = tintCanvas(imageToCanvas(photos.gravel.diff, size, 'blur(1px)'), (r, g, b) => {
@@ -54,44 +60,6 @@ export function buildSurfaceArrays(photos, size) {
   const flat = flatNormalCanvas(size);
   const normal = arrayTexture([n(photos.asphalt.nor), n(photos.asphalt.nor), n(photos.concrete.nor), n(photos.gravel.nor), flat, n(photos.grass.nor), n(photos.dry.nor), n(photos.gravel.nor), n(photos.gravel.nor), n(photos.concrete.nor)], { srgb: false });
   return { color, normal };
-}
-
-// Summer meadow: luminance detail from the photo, colour from a green palette, plus painted blades.
-function grassCanvas(size, photo) {
-  const c = canvas(size);
-  const g = c.getContext('2d', { willReadFrequently: true });
-  const src = photo.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, size, size).data;
-  const img = g.createImageData(size, size);
-  const r = rng(4049);
-  for (let i = 0; i < size * size; i++) {
-    const lum = (src[i * 4] * 0.3 + src[i * 4 + 1] * 0.59 + src[i * 4 + 2] * 0.11) / 255;
-    const v = 0.55 + lum * 0.75;
-    img.data[i * 4] = Math.min(255, 64 * v + 6);
-    img.data[i * 4 + 1] = Math.min(255, 96 * v + 10);
-    img.data[i * 4 + 2] = Math.min(255, 38 * v);
-    img.data[i * 4 + 3] = 255;
-  }
-  g.putImageData(img, 0, 0);
-  const blades = size * 9;
-  for (let i = 0; i < blades; i++) {
-    const x = r() * size;
-    const y = r() * size;
-    const len = 3 + r() * 7;
-    const ang = -Math.PI / 2 + (r() - 0.5) * 1.2;
-    const k = r();
-    g.strokeStyle = k < 0.15 ? 'rgba(170,165,90,0.55)' : k < 0.6 ? 'rgba(78,118,42,0.5)' : 'rgba(110,150,60,0.45)';
-    g.lineWidth = 1 + r();
-    for (const ox of [0, -size, size]) {
-      for (const oy of [0, -size, size]) {
-        if ((ox || oy) && x > 12 && x < size - 12 && y > 12 && y < size - 12) continue;
-        g.beginPath();
-        g.moveTo(x + ox, y + oy);
-        g.lineTo(x + ox + Math.cos(ang) * len, y + oy + Math.sin(ang) * len);
-        g.stroke();
-      }
-    }
-  }
-  return c;
 }
 
 function pavingCanvas(size) {

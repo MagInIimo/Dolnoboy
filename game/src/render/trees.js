@@ -9,96 +9,69 @@ import { patchMaterial } from './patch.js';
 export const SPECIES = ['birch', 'spruce', 'pine', 'oak', 'linden', 'poplar', 'apple', 'maple', 'bush'];
 const SPECIES_INDEX = Object.fromEntries(SPECIES.map((s, i) => [s, i]));
 
-// Atlas layout (1024 x 1024): row 0..1 leaf cards (4 cells of 256 per row), bottom rows bark strips.
-function paintAtlas() {
-  const c = canvas(1024, 1024);
+// Atlas (2 x 1 cells of leaves per row pair, bark strips below). Leaf cells hold photo branches:
+// a birch branch and a spruce bough, plus tinted copies for the other species.
+function paintAtlas(photos, size) {
+  const c = canvas(size, size);
   const g = c.getContext('2d');
-  g.clearRect(0, 0, 1024, 1024);
+  g.clearRect(0, 0, size, size);
+  const q = size / 4;
   const r = rng(99);
-  const leafCell = (cx, cy, palette, size, count, shape) => {
-    for (let i = 0; i < count; i++) {
-      const a = r() * Math.PI * 2;
-      const d = Math.sqrt(r()) * 112;
-      const x = cx + 128 + Math.cos(a) * d;
-      const y = cy + 128 + Math.sin(a) * d * 0.92;
-      const col = palette[Math.floor(r() * palette.length)];
-      g.fillStyle = col;
-      g.save();
-      g.translate(x, y);
-      g.rotate(r() * Math.PI * 2);
-      g.beginPath();
-      if (shape === 'needle') g.ellipse(0, 0, size * 1.8, size * 0.28, 0, 0, Math.PI * 2);
-      else g.ellipse(0, 0, size, size * 0.62, 0, 0, Math.PI * 2);
-      g.fill();
-      g.restore();
-    }
-    // twigs
-    g.strokeStyle = 'rgba(70,52,38,0.8)';
-    g.lineWidth = 2;
-    for (let i = 0; i < 7; i++) {
-      g.beginPath();
-      g.moveTo(cx + 128, cy + 230);
-      g.quadraticCurveTo(cx + 128 + (r() - 0.5) * 80, cy + 150, cx + 128 + (r() - 0.5) * 200, cy + 30 + r() * 80);
-      g.stroke();
-    }
+  const cell = (cx, cy, img, filter, flip = false) => {
+    g.save();
+    g.filter = filter;
+    g.translate(cx * q + (flip ? q : 0), cy * q);
+    g.scale(flip ? -1 : 1, 1);
+    g.drawImage(img, 2, 2, q - 4, q - 4);
+    g.restore();
   };
-  const broad = ['#3f6a2a', '#4c7a31', '#2f5522', '#5a8a38', '#365f26', '#68953f'];
-  const birch = ['#6f9a3a', '#86ad45', '#5c8a30', '#9abb52', '#78a03c'];
-  const spruce = ['#1f3b26', '#264a2d', '#18321f', '#2e5534', '#203d2a'];
-  const pine = ['#2f5229', '#3a6230', '#284824', '#456d36'];
-  const apple = ['#4f7f30', '#5e8f38', '#40702a', '#d33a2a'];
-  const autumn = ['#c9822e', '#d8a03a', '#b5662a', '#9a8a35', '#7a8a32'];
-  leafCell(0, 0, broad, 9, 900, 'leaf');
-  leafCell(256, 0, birch, 6, 1200, 'leaf');
-  // spruce branch: drooping layered needles
-  {
-    const cx = 512;
-    const cy = 0;
-    for (let i = 0; i < 1800; i++) {
-      const t = r();
-      const x = cx + 128 + (r() - 0.5) * 240 * (0.3 + t * 0.7);
-      const y = cy + 30 + t * 200 + (r() - 0.5) * 20;
-      g.strokeStyle = spruce[Math.floor(r() * spruce.length)];
-      g.lineWidth = 2;
-      g.beginPath();
-      g.moveTo(x, y);
-      g.lineTo(x + (r() - 0.5) * 10, y + 6 + r() * 8);
-      g.stroke();
-    }
+  const leaf = photos.foliage.diff;
+  const bough = photos.spruce.diff;
+  cell(0, 0, leaf, 'hue-rotate(10deg) saturate(1.1) brightness(0.82)');
+  cell(1, 0, leaf, 'saturate(1.05) brightness(1.02)');
+  cell(2, 0, bough, 'brightness(0.86)');
+  cell(3, 0, bough, 'hue-rotate(-14deg) saturate(0.85) brightness(1.02)', true);
+  cell(0, 1, leaf, 'hue-rotate(4deg) saturate(1.2) brightness(0.9)', true);
+  cell(1, 1, leaf, 'hue-rotate(16deg) saturate(1.15) brightness(0.72)', true);
+  cell(2, 1, leaf, 'hue-rotate(-38deg) saturate(1.4) brightness(1.05)');
+  cell(3, 1, leaf, 'hue-rotate(8deg) saturate(0.9) brightness(0.8)');
+  // apples on the apple tree cell
+  g.fillStyle = '#c8321f';
+  for (let i = 0; i < 26; i++) {
+    g.beginPath();
+    g.arc(q * 0.15 + r() * q * 0.7, q * 1.15 + r() * q * 0.7, q * 0.012, 0, Math.PI * 2);
+    g.fill();
   }
-  leafCell(768, 0, pine, 7, 1100, 'needle');
-  leafCell(0, 256, apple, 7, 900, 'leaf');
-  leafCell(256, 256, broad.map((c) => c), 11, 700, 'leaf');
-  leafCell(512, 256, autumn, 8, 900, 'leaf');
-  leafCell(768, 256, ['#4c6b2c', '#5d7d36', '#3e5c25'], 6, 1300, 'leaf');
   // bark strips: birch, pine, generic, spruce
+  const h = size / 8;
   const bark = (y0, base, fn) => {
     g.fillStyle = base;
-    g.fillRect(0, y0, 1024, 128);
+    g.fillRect(0, y0, size, h);
     fn(y0);
   };
-  bark(512, '#e7e3d6', (y0) => {
-    for (let i = 0; i < 260; i++) {
-      g.fillStyle = r() < 0.7 ? '#2a2725' : '#77736a';
-      g.fillRect(r() * 1024, y0 + r() * 128, 8 + r() * 26, 2 + r() * 4);
+  const k = size / 1024;
+  bark(size / 2, '#e2ded2', (y0) => {
+    for (let i = 0; i < 300; i++) {
+      g.fillStyle = r() < 0.7 ? '#2a2725' : '#8a867c';
+      g.fillRect(r() * size, y0 + r() * h, (8 + r() * 26) * k, (2 + r() * 4) * k);
     }
   });
-  bark(640, '#a2603a', (y0) => {
-    for (let i = 0; i < 400; i++) {
-      g.fillStyle = r() < 0.5 ? '#6a3a22' : '#c27a4a';
-      g.fillRect(r() * 1024, y0 + r() * 128, 4 + r() * 10, 6 + r() * 14);
-    }
-  });
-  bark(768, '#5a4636', (y0) => {
+  bark(size / 2 + h, '#9c5a36', (y0) => {
     for (let i = 0; i < 500; i++) {
-      g.fillStyle = r() < 0.5 ? '#3a2c22' : '#6e5845';
-      g.fillRect(r() * 1024, y0 + r() * 128, 3 + r() * 6, 10 + r() * 20);
+      g.fillStyle = r() < 0.5 ? '#5e3420' : '#b8744a';
+      g.fillRect(r() * size, y0 + r() * h, (4 + r() * 10) * k, (6 + r() * 14) * k);
     }
   });
-  bark(896, '#4a3a2e', (y0) => {
-    for (let i = 0; i < 400; i++) {
-      g.fillStyle = r() < 0.5 ? '#2e241c' : '#5e4a3a';
-      g.fillRect(r() * 1024, y0 + r() * 128, 3 + r() * 8, 4 + r() * 8);
+  bark(size / 2 + 2 * h, '#4f3e31', (y0) => {
+    for (let i = 0; i < 600; i++) {
+      g.fillStyle = r() < 0.5 ? '#33271e' : '#6a5543';
+      g.fillRect(r() * size, y0 + r() * h, (3 + r() * 6) * k, (10 + r() * 20) * k);
+    }
+  });
+  bark(size / 2 + 3 * h, '#463629', (y0) => {
+    for (let i = 0; i < 500; i++) {
+      g.fillStyle = r() < 0.5 ? '#2a2019' : '#5a4636';
+      g.fillRect(r() * size, y0 + r() * h, (3 + r() * 8) * k, (4 + r() * 8) * k);
     }
   });
   return c;
@@ -117,8 +90,10 @@ function barkUV(kind) {
 }
 
 // Builds one species model in a GeoBuilder: trunk + leaf cards; uv pointing into the atlas.
+// Leaf normals point away from the crown centre so a crown has a lit side and a shaded side.
 function speciesModel(species, r) {
   const gb = new GeoBuilder({ aShade: 1 });
+  let crown = [0, 6, 0];
   const card = (cx, cy, cz, w, h, yaw, tilt, cell, shade = 1) => {
     const uv = cellUV(cell);
     const s = Math.sin(yaw);
@@ -126,22 +101,32 @@ function speciesModel(species, r) {
     const up = [Math.sin(tilt) * c, Math.cos(tilt), -Math.sin(tilt) * s];
     const right = [c, 0, s];
     const P = (u, v) => [cx + right[0] * u + up[0] * v, cy + right[1] * u + up[1] * v, cz + right[2] * u + up[2] * v];
-    const nx = -s;
-    const nz = c;
-    const a = gb.vertex(...P(-w / 2, -h / 2), nx, 0.5, nz, uv.u0, uv.v0, { aShade: shade * 0.8 });
-    const b = gb.vertex(...P(w / 2, -h / 2), nx, 0.5, nz, uv.u1, uv.v0, { aShade: shade * 0.8 });
-    const cc = gb.vertex(...P(w / 2, h / 2), nx, 0.5, nz, uv.u1, uv.v1, { aShade: shade });
-    const d = gb.vertex(...P(-w / 2, h / 2), nx, 0.5, nz, uv.u0, uv.v1, { aShade: shade });
+    const N = (p) => {
+      const x = p[0] - crown[0];
+      const y = (p[1] - crown[1]) * 0.8 + 1.2;
+      const z = p[2] - crown[2];
+      const l = Math.hypot(x, y, z) || 1;
+      return [x / l, y / l, z / l];
+    };
+    const vert = (u, v, tu, tv, k) => {
+      const p = P(u, v);
+      const n = N(p);
+      return gb.vertex(p[0], p[1], p[2], n[0], n[1], n[2], tu, tv, { aShade: shade * k });
+    };
+    const a = vert(-w / 2, -h / 2, uv.u0, uv.v0, 0.82);
+    const b = vert(w / 2, -h / 2, uv.u1, uv.v0, 0.82);
+    const cc = vert(w / 2, h / 2, uv.u1, uv.v1, 1);
+    const d = vert(-w / 2, h / 2, uv.u0, uv.v1, 1);
     gb.idx.push(a, b, cc, a, cc, d, a, cc, b, a, d, cc);
   };
-  const trunk = (h, r0, r1, bark, n = 6) => {
+  const trunk = (h, r0, r1, bark, n = 7) => {
     const uv = barkUV(bark);
     const base = gb.count;
     for (let i = 0; i <= n; i++) {
       const a = (i / n) * Math.PI * 2;
       const s = Math.sin(a);
       const c = Math.cos(a);
-      gb.vertex(s * r0, 0, c * r0, s, 0, c, uv.u0 + (i / n) * 0.5, uv.v0, { aShade: 0.7 });
+      gb.vertex(s * r0, -0.3, c * r0, s, 0, c, uv.u0 + (i / n) * 0.5, uv.v0, { aShade: 0.65 });
       gb.vertex(s * r1, h, c * r1, s, 0, c, uv.u0 + (i / n) * 0.5, uv.v1, { aShade: 1 });
     }
     for (let i = 0; i < n; i++) {
@@ -149,101 +134,103 @@ function speciesModel(species, r) {
       gb.idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
     }
   };
+  // a ball-ish crown of cards around (0, y, 0) with radius rad
+  const ball = (y, rad, count, size, cell, cell2 = cell) => {
+    crown = [0, y, 0];
+    for (let i = 0; i < count; i++) {
+      const a = r() * Math.PI * 2;
+      const e = (r() - 0.35) * 1.4;
+      const d = rad * (0.35 + Math.sqrt(r()) * 0.65);
+      const cy = y + Math.sin(e) * d * 0.8;
+      card(Math.sin(a) * Math.cos(e) * d, cy, Math.cos(a) * Math.cos(e) * d, size * (0.85 + r() * 0.35), size * (0.85 + r() * 0.35), r() * Math.PI, (r() - 0.5) * 0.9, i % 3 ? cell : cell2, 0.72 + ((cy - y + rad) / (2 * rad)) * 0.36);
+    }
+  };
   switch (species) {
     case 'birch': {
-      trunk(11, 0.2, 0.08, 'birch');
-      for (let i = 0; i < 14; i++) {
-        const y = 5 + r() * 7;
-        const a = r() * Math.PI * 2;
-        const d = 0.6 + r() * 1.6;
-        card(Math.sin(a) * d, y, Math.cos(a) * d, 3.0 + r(), 3.2 + r(), r() * Math.PI, (r() - 0.5) * 0.6, 'birch', 0.75 + (y - 5) / 20);
-      }
+      trunk(13, 0.2, 0.07, 'birch');
+      ball(9.5, 3.2, 26, 3.0, 'birch');
+      ball(12.2, 1.8, 8, 2.4, 'birch');
       break;
     }
     case 'spruce': {
-      trunk(14, 0.28, 0.06, 'spruce');
-      const tiers = 9;
+      trunk(16, 0.3, 0.06, 'spruce');
+      const tiers = 12;
       for (let t = 0; t < tiers; t++) {
-        const y = 1.2 + t * 1.45;
-        const rad = 3.2 * (1 - t / tiers) + 0.4;
-        for (let k = 0; k < 5; k++) {
-          const a = (k / 5) * Math.PI * 2 + t * 0.6;
-          card(Math.sin(a) * rad * 0.5, y + 0.6, Math.cos(a) * rad * 0.5, rad * 1.3, 2.2, a + Math.PI / 2, 0.55, 'spruce', 0.65 + t / tiers * 0.4);
+        const y = 1.0 + t * 1.25;
+        const rad = 3.4 * (1 - t / tiers) + 0.35;
+        crown = [0, y + 3, 0];
+        const n = t < 9 ? 7 : 5;
+        for (let k = 0; k < n; k++) {
+          const a = (k / n) * Math.PI * 2 + t * 0.7 + r() * 0.3;
+          card(Math.sin(a) * rad * 0.52, y + 0.4, Math.cos(a) * rad * 0.52, rad * 1.35, 2.0, a + Math.PI / 2, 0.6, 'spruce', 0.6 + (t / tiers) * 0.45);
         }
       }
-      card(0, 14.2, 0, 1.2, 2.4, 0, 0, 'spruce', 1);
-      card(0, 14.2, 0, 1.2, 2.4, Math.PI / 2, 0, 'spruce', 1);
+      crown = [0, 14, 0];
+      card(0, 16.0, 0, 1.0, 2.4, 0, 0, 'spruce', 1);
+      card(0, 16.0, 0, 1.0, 2.4, Math.PI / 2, 0, 'spruce', 1);
       break;
     }
     case 'pine': {
-      trunk(15, 0.3, 0.12, 'pine');
-      for (let i = 0; i < 11; i++) {
-        const y = 10 + r() * 6;
-        const a = r() * Math.PI * 2;
-        const d = 0.5 + r() * 2.2;
-        card(Math.sin(a) * d, y, Math.cos(a) * d, 3.4, 2.4, r() * Math.PI, (r() - 0.5) * 1.2, 'pine', 0.8 + (y - 10) / 30);
-      }
+      trunk(17, 0.32, 0.12, 'pine');
+      ball(14.5, 3.0, 22, 3.2, 'pine');
+      ball(12.2, 2.2, 8, 2.6, 'pine');
       break;
     }
     case 'oak':
     case 'linden':
     case 'maple': {
-      trunk(species === 'linden' ? 7 : 5, 0.36, 0.18, 'generic');
-      const n = species === 'oak' ? 16 : 14;
-      for (let i = 0; i < n; i++) {
-        const y = 4 + r() * 6.5;
-        const a = r() * Math.PI * 2;
-        const d = r() * 3.2;
-        card(Math.sin(a) * d, y, Math.cos(a) * d, 4 + r() * 1.2, 4 + r(), r() * Math.PI, (r() - 0.5) * 0.8, i % 3 ? 'broad' : 'broad2', 0.7 + (y - 4) / 18);
-      }
+      trunk(species === 'linden' ? 8 : 6, 0.4, 0.18, 'generic');
+      ball(species === 'linden' ? 8.5 : 7.5, 4.0, 34, 3.6, 'broad', species === 'maple' ? 'bush' : 'broad2');
+      ball(species === 'linden' ? 11.2 : 10, 2.4, 10, 3.0, 'broad');
       break;
     }
     case 'poplar': {
-      trunk(14, 0.3, 0.1, 'generic');
-      for (let i = 0; i < 14; i++) {
-        const y = 3 + i * 1.0;
-        const a = r() * Math.PI * 2;
-        const d = r() * 0.9;
-        card(Math.sin(a) * d, y, Math.cos(a) * d, 2.6 - i * 0.07, 3.2, r() * Math.PI, (r() - 0.5) * 0.3, 'broad2', 0.7 + i / 40);
-      }
+      trunk(16, 0.32, 0.1, 'generic');
+      for (let i = 0; i < 9; i++) ball(4 + i * 1.4, 1.5 - i * 0.05, 4, 2.6, 'broad2', 'broad');
       break;
     }
     case 'apple': {
-      trunk(2.4, 0.16, 0.1, 'generic');
-      for (let i = 0; i < 9; i++) {
-        const y = 2.2 + r() * 2.6;
-        const a = r() * Math.PI * 2;
-        const d = r() * 1.5;
-        card(Math.sin(a) * d, y, Math.cos(a) * d, 2.4, 2.2, r() * Math.PI, (r() - 0.5) * 0.8, 'apple', 0.8);
-      }
+      trunk(2.6, 0.17, 0.1, 'generic');
+      ball(3.6, 2.0, 14, 2.2, 'apple');
       break;
     }
     default: {
-      for (let i = 0; i < 6; i++) {
-        const a = r() * Math.PI * 2;
-        card(Math.sin(a) * 0.6, 0.8, Math.cos(a) * 0.6, 2.2, 1.8, r() * Math.PI, (r() - 0.5) * 0.6, 'bush', 0.8);
-      }
+      ball(1.0, 1.1, 9, 1.9, 'bush', 'broad2');
     }
   }
   return gb;
 }
 
 export class TreeSystem {
-  constructor(engine, world, quality) {
+  constructor(engine, world, quality, photos) {
     this.engine = engine;
     this.world = world;
     this.name = 'trees';
     this.density = quality.trees;
     this.shadows = quality.shadows > 0;
-    const atlas = new THREE.CanvasTexture(paintAtlas());
+    const atlas = new THREE.CanvasTexture(paintAtlas(photos, quality.texture >= 512 ? 2048 : 1024));
     atlas.colorSpace = THREE.SRGBColorSpace;
     atlas.anisotropy = 4;
     this.atlas = atlas;
-    this.material = new THREE.MeshStandardMaterial({ map: atlas, alphaTest: 0.42, side: THREE.DoubleSide, roughness: 0.92, metalness: 0 });
+    // cards already carry both windings, so single-sided rendering keeps the crown normals intact
+    this.material = new THREE.MeshStandardMaterial({ map: atlas, alphaTest: 0.45, side: THREE.FrontSide, roughness: 0.88, metalness: 0, alphaToCoverage: !!quality.antialias });
+    this.wind = { value: 0 };
     patchMaterial(this.material, {
       key: 'tree',
-      uniforms: { uWind: { value: 0 } },
+      uniforms: { uWind: this.wind },
       vertexHead: 'attribute float aShade;\nvarying float vShade;\nuniform float uWind;',
+      vertexBegin: `
+        {
+          #ifdef USE_INSTANCING
+            vec3 iPos = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
+          #else
+            vec3 iPos = vec3(0.0);
+          #endif
+          float sway = max(0.0, position.y - 2.0) * 0.011;
+          transformed.x += sin(uWind * 1.3 + iPos.x * 0.07 + position.y * 0.3) * sway;
+          transformed.z += cos(uWind * 1.05 + iPos.z * 0.07 + position.y * 0.25) * sway * 0.7;
+        }
+      `,
       vertexBody: 'vShade = aShade;',
       fragmentHead: 'varying float vShade;',
       fragmentMap: `
@@ -286,9 +273,10 @@ export class TreeSystem {
     const sun = new THREE.DirectionalLight(0xffffff, 2.2);
     sun.position.set(0.4, 1, 0.8);
     scene.add(sun);
-    const cam = new THREE.OrthographicCamera(-9, 9, 18, 0, 0.1, 100);
-    cam.position.set(0, 8, 40);
-    cam.lookAt(0, 8, 0);
+    // capture the whole tree from the ground to 24 m; the billboard keeps the same 18 x 24 proportions
+    const cam = new THREE.OrthographicCamera(-9, 9, 24, 0, 0.1, 100);
+    cam.position.set(0, 0, 40);
+    cam.lookAt(0, 0, 0);
     const r = this.engine.renderer;
     const prev = r.getRenderTarget();
     const prevClear = new THREE.Color();
@@ -323,7 +311,8 @@ export class TreeSystem {
       vertexHead: `attribute float aCell;\nvarying float vCell;\nuniform vec3 uCam;\n`,
       vertexBody: '',
       fragmentMap: `
-        vec2 cuv = vMapUv;
+        // stay half a texel inside the cell so neighbouring cells never bleed in
+        vec2 cuv = clamp(vMapUv, vec2(1.0 / 256.0), vec2(1.0 - 1.0 / 256.0));
         float ci = floor(vCellF + 0.5);
         vec2 cellUv = vec2((mod(ci, ${cols}.0) + cuv.x) / ${cols}.0, (${rows}.0 - 1.0 - floor(ci / ${cols}.0) + cuv.y) / ${rows}.0);
         vec4 texel = texture2D(map, cellUv);
@@ -465,6 +454,7 @@ export class TreeSystem {
 
   update(dt, camPos) {
     this.camUniform.value.copy(camPos);
+    this.wind.value += Math.min(dt, 0.1);
     this.timer -= dt;
     const moved = this.lastFocus.distanceToSquared(camPos) > 18 * 18;
     if (!(this.dirty || (moved && this.timer <= 0))) return;
@@ -495,7 +485,7 @@ export class TreeSystem {
           m.compose(pos, q, scale);
           this.near[species].setMatrixAt(counts[species]++, m);
         } else if (farCount < this.farCapacity) {
-          const h = 18 * t.scale;
+          const h = 24 * t.scale;
           const w = 18 * t.scale;
           const o = farCount * 16;
           farMatrix[o] = w;

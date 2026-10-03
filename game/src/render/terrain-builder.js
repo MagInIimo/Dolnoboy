@@ -40,7 +40,10 @@ export function* buildTerrain(world, x0, z0, size, step) {
   const W = WATER_LEVEL;
   for (let j = 0; j < n; j++) {
     for (let i = 0; i < n; i++) {
-      const h = H[(j + 1) * m + (i + 1)];
+      let h = H[(j + 1) * m + (i + 1)];
+      // coarse grids cannot follow a road's edge: tuck them a little lower so asphalt never sinks below grass
+      const gap = R[(j + 1) * m + (i + 1)];
+      if (step > 4 && gap < step) h -= Math.min(2.5, step * 0.15) * (1 - Math.max(0, gap) / step);
       const hl = H[(j + 1) * m + i];
       const hr = H[(j + 1) * m + i + 2];
       const hd = H[j * m + i + 1];

@@ -38,9 +38,9 @@ for (const s of steps) {
   if (s.up) await page.keyboard.up(s.up);
   if (s.click) await page.click(s.click);
   if (s.eval) evals.push(await page.evaluate(s.eval));
-  if (s.shot) await page.screenshot({ path: path.join(out, `${name}-${s.shot === true ? shotIndex++ : s.shot}.png`) });
+  if (s.shot) await page.screenshot({ path: path.join(out, `${name}-${s.shot === true ? shotIndex++ : s.shot}.png`), timeout: 180000 });
 }
-await page.screenshot({ path: path.join(out, `${name}.png`) });
+await page.screenshot({ path: path.join(out, `${name}.png`), timeout: 180000 });
 const info = await page.evaluate(() => {
   const e = window.game?.engine;
   if (!e) return { state: document.getElementById('loading')?.dataset.state, stage: document.getElementById('lstage')?.textContent };

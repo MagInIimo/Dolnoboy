@@ -18,6 +18,8 @@ export function vehicleMaterials() {
     rim: new THREE.MeshStandardMaterial({ color: 0xbfc4c8, metalness: 0.9, roughness: 0.25 }),
     glass: new THREE.MeshStandardMaterial({ color: 0x0d1a22, metalness: 0.2, roughness: 0.04, transparent: true, opacity: 0.72 }),
     glassDark: new THREE.MeshStandardMaterial({ color: 0x0a1115, metalness: 0.3, roughness: 0.05 }),
+    // the same windows seen from the driver's seat: clear with a faint reflection
+    glassInside: new THREE.MeshStandardMaterial({ color: 0x9fb4c2, metalness: 0.1, roughness: 0.05, transparent: true, opacity: 0.08, depthWrite: false }),
     headlight: new THREE.MeshStandardMaterial({ color: 0xe8eef2, metalness: 0.6, roughness: 0.1, emissive: 0xfff4dc, emissiveIntensity: 0 }),
     tail: new THREE.MeshStandardMaterial({ color: 0x5a0a08, metalness: 0.2, roughness: 0.3, emissive: 0xff2010, emissiveIntensity: 0.15 }),
     indicator: new THREE.MeshStandardMaterial({ color: 0x8a5a10, metalness: 0.2, roughness: 0.3, emissive: 0xff9a10, emissiveIntensity: 0 }),
@@ -124,9 +126,10 @@ export function buildTractor(spec = {}) {
   const wsH = cabType === 'sokol' ? 0.95 : 1.02;
   const ws = add(new THREE.BoxGeometry(cabW - 0.22, wsH, 0.05), M.glassDark, 0, cabBottom + cabH * 0.66, cabFront + 0.035);
   ws.rotation.x = -0.12;
+  const windows = [ws];
   // side windows and door outlines
   for (const s of [-1, 1]) {
-    add(new THREE.BoxGeometry(0.04, 0.78, 0.92), M.glassDark, s * (cabW / 2 + 0.005), cabBottom + cabH * 0.64, cabFront - 0.62);
+    windows.push(add(new THREE.BoxGeometry(0.04, 0.78, 0.92), M.glassDark, s * (cabW / 2 + 0.005), cabBottom + cabH * 0.64, cabFront - 0.62));
     add(new THREE.BoxGeometry(0.035, 1.6, 0.03), M.black, s * (cabW / 2 + 0.01), cabBottom + 0.95, cabFront - 1.12, body, false);
     // steps
     add(new THREE.BoxGeometry(0.32, 0.06, 0.55), M.alu, s * (cabW / 2 - 0.12), 0.62, cabFront - 0.65);
@@ -228,6 +231,7 @@ export function buildTractor(spec = {}) {
     paint,
     lights,
     interior,
+    windows,
     eye: new THREE.Vector3(-0.55, cabBottom + 1.55, cabFront - 0.95),
     mirrorL: body.getObjectByName('mirrorGlassL'),
     mirrorR: body.getObjectByName('mirrorGlassR'),

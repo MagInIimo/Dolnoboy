@@ -12,10 +12,10 @@ const KEYS = [
 ];
 
 export const WEATHERS = {
-  clear: { ru: 'Ясно', en: 'Clear', cloud: 0.15, overcast: 0, fogFar: 2200, rain: 0, grip: 1 },
-  cloudy: { ru: 'Облачно', en: 'Cloudy', cloud: 0.6, overcast: 0.25, fogFar: 1900, rain: 0, grip: 1 },
-  overcast: { ru: 'Пасмурно', en: 'Overcast', cloud: 1, overcast: 0.75, fogFar: 1500, rain: 0, grip: 0.97 },
-  rain: { ru: 'Дождь', en: 'Rain', cloud: 1, overcast: 0.9, fogFar: 900, rain: 1, grip: 0.72 },
+  clear: { ru: 'Ясно', en: 'Clear', cloud: 0.15, overcast: 0, fogFar: 6500, rain: 0, grip: 1 },
+  cloudy: { ru: 'Облачно', en: 'Cloudy', cloud: 0.6, overcast: 0.25, fogFar: 5200, rain: 0, grip: 1 },
+  overcast: { ru: 'Пасмурно', en: 'Overcast', cloud: 1, overcast: 0.75, fogFar: 3600, rain: 0, grip: 0.97 },
+  rain: { ru: 'Дождь', en: 'Rain', cloud: 1, overcast: 0.9, fogFar: 1300, rain: 1, grip: 0.72 },
   fog: { ru: 'Туман', en: 'Fog', cloud: 0.8, overcast: 0.7, fogFar: 340, rain: 0, grip: 0.9 },
 };
 

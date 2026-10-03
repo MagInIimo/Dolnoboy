@@ -6,6 +6,7 @@ export function patchMaterial(material, opts) {
     let vs = shader.vertexShader;
     let fs = shader.fragmentShader;
     vs = vs.replace('#include <common>', '#include <common>\nvarying vec3 vWorldPos;\nvarying vec3 vWorldNormal;\n' + (opts.vertexHead ?? ''));
+    if (opts.vertexBegin) vs = vs.replace('#include <begin_vertex>', '#include <begin_vertex>\n' + opts.vertexBegin);
     vs = vs.replace(
       '#include <project_vertex>',
       `#include <project_vertex>
