@@ -97,11 +97,14 @@ export class Game {
     L.stage('loadingDone', 0.7);
     const focus = new THREE.Vector3(this.truck.physics.x, this.truck.physics.y, this.truck.physics.z);
     engine.update(0.016, focus);
+    // only the surroundings must be ready; the horizon keeps streaming in while driving
+    let first = 0;
     for (let i = 0; i < 2000; i++) {
       this.view.update(focus, 30);
       this.trees.update(1, focus);
-      const left = this.view.pending;
-      L.stage('loadingDone', 0.7 + 0.28 * (1 - Math.min(1, left / 40)));
+      const left = this.view.pendingWithin(700);
+      first = Math.max(first, left);
+      L.stage('loadingDone', 0.7 + 0.28 * (1 - left / Math.max(1, first)));
       if (left === 0 && i > 2) break;
       await L.frame();
     }
@@ -1019,6 +1022,7 @@ export class Game {
       this.buildingMat.userData.shader && (this.buildingMat.userData.shader.uniforms.uNight.value = night * 0.95 + (this.engine.env.weatherBlend.overcast > 0.8 ? 0.15 : 0));
       this.view.update(focus, this.running ? 4 : 8);
       this.trees.update(dt, this.engine.camera.position);
+      this.buildings.update(this.engine.camera.position);
       this.props.update(dt, this.engine.camera.position, night);
       this.traffic.update(dt, this.engine.camera.position, night);
       this.rain.update(dt, this.engine.camera, this.engine.env.weatherBlend.rain, this.rig.mode === 'cab');

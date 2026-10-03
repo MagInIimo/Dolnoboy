@@ -1,4 +1,4 @@
-import { CITIES, cityRadius } from '../data/cities.js';
+import { CITIES, fitRadii, fringeWidth } from '../data/cities.js';
 import { HIGHWAYS } from '../data/roads.js';
 import { project, WATER_LEVEL, SCALE } from '../core/geo.js';
 import { SpatialHash, centripetalCatmull, clamp, hashString, lerp, resample, rng, segmentIntersection, smoothstep, wrapAngle } from '../core/util.js';
@@ -8,15 +8,13 @@ import { RoadNetwork } from './network.js';
 import { planCityLots, planCityStreets } from './city-plan.js';
 
 const W = WATER_LEVEL;
-const HW_STEP = 6;
+const HW_STEP = 8;
 
 export class World {
   constructor() {
-    this.cities = CITIES.map((c) => {
-      const p = project(c.lat, c.lon);
-      const R = cityRadius(c.pop);
-      return { ...c, x: p.x, z: p.z, R, Rout: R + (R >= 400 ? 200 : 160) };
-    });
+    const placed = CITIES.map((c) => ({ ...c, ...project(c.lat, c.lon) }));
+    const radii = fitRadii(placed);
+    this.cities = placed.map((c, i) => ({ ...c, R: radii[i], Rout: radii[i] + fringeWidth(radii[i]) }));
     this.cityHash = new SpatialHash(2048);
     for (const c of this.cities) {
       const r = c.Rout + 420;
@@ -26,6 +24,7 @@ export class World {
     this.net = new RoadNetwork();
     this.lots = [];
     this.lotHash = new SpatialHash(128);
+    this.roadScratch = { n: 0, d: new Float64Array(64), y: new Float64Array(64), o: new Float64Array(64) };
     this.villages = [];
     this.cameras = [];
     this.signs = [];
@@ -79,22 +78,35 @@ export class World {
     return this.water.carve(x, z, h, roadGuard);
   }
 
-  terrainHeight(x, z) {
-    const roads = this.net.query(x, z, 46);
+  // Terrain under (x, z): natural relief flattened for cities, carved by water and blended into road
+  // embankments. out.road receives the distance beyond the nearest road's outer edge (for scenery masks).
+  terrainHeight(x, z, out = null) {
+    const near = this.roadScratch;
+    near.n = 0;
     let guard = Infinity;
-    for (const q of roads) if (q.edge.type.highway) guard = Math.min(guard, Math.max(0, q.d - q.edge.type.outerHalf));
+    let edgeGap = Infinity;
+    this.net.scan(x, z, 46, (edge, i, t, d, lateral, s, y, bridge) => {
+      const o = edge.type.outerHalf;
+      if (edge.type.highway) guard = Math.min(guard, Math.max(0, d - o));
+      edgeGap = Math.min(edgeGap, d - o);
+      if (bridge || near.n >= 64) return;
+      near.d[near.n] = d;
+      near.y[near.n] = y;
+      near.o[near.n] = o;
+      near.n++;
+    });
+    if (out) out.road = edgeGap;
     const natural = this.baseHeight(x, z, guard);
     let h = natural;
     let bestW = 0;
     let target = 0;
-    for (const q of roads) {
-      if (q.bridge) continue;
-      const flat = q.edge.type.outerHalf + 1.5;
-      const blend = clamp(6 + Math.abs(q.y - natural) * 1.7, 6, 44);
-      const w = 1 - smoothstep(flat, flat + blend, q.d);
+    for (let k = 0; k < near.n; k++) {
+      const flat = near.o[k] + 1.5;
+      const blend = clamp(6 + Math.abs(near.y[k] - natural) * 1.7, 6, 44);
+      const w = 1 - smoothstep(flat, flat + blend, near.d[k]);
       if (w > bestW) {
         bestW = w;
-        target = q.y - 0.12;
+        target = near.y[k] - 0.12;
       }
     }
     if (bestW > 0) h = lerp(h, target, bestW);
@@ -116,28 +128,27 @@ export class World {
 
   // Drivable surface under (x, z). refY picks the right level under bridges.
   groundAt(x, z, refY = null) {
-    const list = this.net.query(x, z, 0);
     let best = null;
     let bestScore = Infinity;
-    for (const q of list) {
-      const t = q.edge.type;
-      const lat = Math.abs(q.lateral);
-      let y = q.y;
+    this.net.scan(x, z, 0, (edge, i, t0, d, lateral, s, yq, bridge) => {
+      const t = edge.type;
+      const lat = Math.abs(lateral);
+      let y = yq;
       let surface = 'road';
       if (lat > t.pavedHalf) {
         if (t.sidewalk > 0 && lat <= t.pavedHalf + t.sidewalk) {
           y += 0.15;
           surface = 'sidewalk';
-        } else if (q.bridge && lat <= t.pavedHalf + 1.2) {
+        } else if (bridge && lat <= t.pavedHalf + 1.2) {
           surface = 'curb';
-        } else continue;
+        } else return;
       }
       const score = refY === null ? -y : y > refY + 1.6 ? 1000 + (y - refY) : Math.abs(refY - y);
       if (score < bestScore) {
         bestScore = score;
-        best = { y, surface, edge: q.edge, s: q.s, lateral: q.lateral, bridge: q.bridge, q };
+        best = { y, surface, edge, s, lateral, bridge };
       }
-    }
+    });
     if (best) return best;
     const lot = this.lotAt(x, z);
     if (lot) return { y: lot.y, surface: 'yard', lot };
@@ -174,9 +185,9 @@ export class World {
       const allVias = via.map(([lat, lon, ru, en]) => ({ ...project(lat, lon), ru, en }));
       const vias = [];
       for (const v of allVias) {
-        if (Math.hypot(v.x - A.x, v.z - A.z) < A.Rout + 620 || Math.hypot(v.x - B.x, v.z - B.z) < B.Rout + 620) continue;
+        if (Math.hypot(v.x - A.x, v.z - A.z) < A.Rout + 500 || Math.hypot(v.x - B.x, v.z - B.z) < B.Rout + 500) continue;
         const prev = vias[vias.length - 1];
-        if (prev && Math.hypot(v.x - prev.x, v.z - prev.z) < 300) continue;
+        if (prev && Math.hypot(v.x - prev.x, v.z - prev.z) < 400) continue;
         vias.push(v);
       }
       const first = allVias[0] ?? B;
@@ -228,7 +239,7 @@ export class World {
         if (a1 <= a0) a1 += Math.PI * 2;
         const ra = Math.hypot(na.x - city.x, na.z - city.z);
         const rb = Math.hypot(nb.x - city.x, nb.z - city.z);
-        const steps = Math.max(3, Math.ceil(((a1 - a0) * (ra + rb)) / 14));
+        const steps = Math.max(3, Math.ceil(((a1 - a0) * (ra + rb)) / 24));
         const pts = [];
         for (let j = 0; j <= steps; j++) {
           const t = j / steps;
@@ -252,7 +263,7 @@ export class World {
       }
       if (!best) continue;
       const pts = [];
-      const steps = Math.max(2, Math.ceil(best.d / 6));
+      const steps = Math.max(2, Math.ceil(best.d / 16));
       for (let j = 0; j <= steps; j++) pts.push({ x: best.n.x + ((en.node.x - best.n.x) * j) / steps, z: best.n.z + ((en.node.z - best.n.z) * j) / steps });
       en.stub = net.addEdge(best.n, en.node, pts, 'A', { city: city.index, role: 'stub', avenue: true });
       plan.edges.push(en.stub);
@@ -292,7 +303,7 @@ export class World {
       const { A, B } = hw;
       const random = rng(hashString(A.id + '>' + B.id));
       const gap = Math.hypot(ea.node.x - eb.node.x, ea.node.z - eb.node.z);
-      const lead = clamp(gap * 0.22, 30, 240);
+      const lead = clamp(gap * 0.18, 40, 420);
       const leadA = { x: ea.node.x + Math.sin(hw.angleA) * lead, z: ea.node.z + Math.cos(hw.angleA) * lead };
       const leadB = { x: eb.node.x + Math.sin(hw.angleB) * lead, z: eb.node.z + Math.cos(hw.angleB) * lead };
       const control = [{ x: ea.node.x, z: ea.node.z }, leadA, ...hw.vias, leadB, { x: eb.node.x, z: eb.node.z }];
@@ -302,12 +313,13 @@ export class World {
         const q = control[i + 1];
         if (i >= 1 && i < control.length - 2) {
           const len = Math.hypot(q.x - p.x, q.z - p.z);
-          const count = len > 1100 ? Math.floor(len / 620) : 0;
+          // gentle meanders between the real waypoints, like a road following the land
+          const count = len > 1600 ? Math.floor(len / 900) : 0;
           const ux = (q.x - p.x) / len;
           const uz = (q.z - p.z) / len;
           for (let j = 1; j <= count; j++) {
             const t = j / (count + 1);
-            const amp = Math.min(len * 0.035, 85) * (random() * 2 - 1);
+            const amp = Math.min(len * 0.03, 160) * (random() * 2 - 1);
             pts.push({ x: p.x + (q.x - p.x) * t - uz * amp, z: p.z + (q.z - p.z) * t + ux * amp });
           }
         }

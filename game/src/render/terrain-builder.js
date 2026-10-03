@@ -8,8 +8,14 @@ export function* buildTerrain(world, x0, z0, size, step) {
   const n = Math.round(size / step) + 1;
   const m = n + 2;
   const H = new Float32Array(m * m);
+  // heights plus the distance to the nearest road edge, sampled in one pass
+  const R = new Float32Array(m * m);
+  const probe = { road: Infinity };
   for (let j = 0; j < m; j++) {
-    for (let i = 0; i < m; i++) H[j * m + i] = world.terrainHeight(x0 + (i - 1) * step, z0 + (j - 1) * step);
+    for (let i = 0; i < m; i++) {
+      H[j * m + i] = world.terrainHeight(x0 + (i - 1) * step, z0 + (j - 1) * step, probe);
+      R[j * m + i] = probe.road;
+    }
     if (j % 6 === 5) yield;
   }
   const { lat, lon } = unproject(x0 + size / 2, z0 + size / 2);
@@ -50,7 +56,7 @@ export function* buildTerrain(world, x0, z0, size, step) {
       const wz = z0 + j * step;
       const dry = dryness(wx, wz, lat);
       const forest = forestDensity(wx, wz, lat, lon);
-      const near = nearClutter(world, wx, wz);
+      const near = nearClutter(world, wx, wz, R[(j + 1) * m + (i + 1)]);
       const fieldNoise = fbm(wx / 1500 + 7.1, wz / 1500 - 3.4, 2);
       const field = (1 - smoothstep(0.35, 0.5, forest)) * smoothstep(-0.15, 0.1, fieldNoise) * (1 - near) * (lat > 61 ? 0.2 : 1);
       const sand = 1 - smoothstep(W + 0.7, W + 1.6, h);
@@ -100,13 +106,13 @@ export function* buildTerrain(world, x0, z0, size, step) {
   return { geometry: g, heights: H, n, m, step, lat, lon };
 }
 
-// 1 near cities, villages, lots and roads: suppresses fields and forest floor shading.
-export function nearClutter(world, x, z) {
+// 1 near cities and roads: suppresses fields and forest floor shading. roadGap = metres beyond the nearest road edge.
+export function nearClutter(world, x, z, roadGap) {
   let v = 0;
   for (const c of world.citiesNear(x, z)) {
     const d = Math.hypot(x - c.x, z - c.z);
     v = Math.max(v, 1 - smoothstep(c.Rout + 40, c.Rout + 260, d));
   }
-  for (const q of world.net.query(x, z, 30)) v = Math.max(v, 1 - smoothstep(q.edge.type.outerHalf + 4, q.edge.type.outerHalf + 30, q.d));
+  if (roadGap < 30) v = Math.max(v, 1 - smoothstep(4, 30, roadGap));
   return v;
 }

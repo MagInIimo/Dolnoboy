@@ -1,4 +1,4 @@
-import { project, WATER_LEVEL } from '../core/geo.js';
+import { project, SCALE, WATER_LEVEL } from '../core/geo.js';
 import { fbm, noise2 } from '../core/util.js';
 
 // Regional relief: [lat, lon, radius km, amplitude m]
@@ -24,7 +24,7 @@ const HILLS = [
 
 const hillCenters = HILLS.map(([lat, lon, km, amp]) => {
   const p = project(lat, lon);
-  return { x: p.x, z: p.z, r: (km * 1000) / 40, amp };
+  return { x: p.x, z: p.z, r: (km * 1000) / SCALE, amp };
 });
 
 export function reliefAmplitude(x, z) {

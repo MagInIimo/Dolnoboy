@@ -183,7 +183,7 @@ export class CityBuildings {
     const maxR = c.Rout + 165;
     for (let rad = this.r0 + 30; rad < maxR; rad += 26) {
       const zoneProbe = this.zone(c.x + rad, c.z);
-      const spacing = zoneProbe === 'fringe' ? 30 : zoneProbe === 'outer' ? 58 : zoneProbe === 'middle' ? 46 : 38;
+      const spacing = zoneProbe === 'fringe' ? 30 : zoneProbe === 'outer' ? 42 : zoneProbe === 'middle' ? 34 : 30;
       const steps = Math.max(6, Math.floor((2 * Math.PI * rad) / spacing));
       const off = r() * Math.PI * 2;
       for (let k = 0; k < steps; k++) {

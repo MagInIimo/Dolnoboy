@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GeoBuilder } from './geo-builder.js';
 import { FACADES, FACADE_PBR, F, paintFacades } from './facades.js';
 import { GLSL_HASH, patchMaterial } from './patch.js';
-import { emitBuilding } from './building-types.js';
+import { emitBuilding, emitBuildingSimple } from './building-types.js';
 import { CityBuildings } from '../world/city-buildings.js';
 import { generateVillage } from '../world/villages.js';
 import { layoutLot } from '../world/lot-layout.js';
@@ -97,6 +97,8 @@ export class BuildingLayer {
     this.cityData = new Map();
     world.colliders = world.colliders ?? new SpatialHash(32);
     this.registered = new Set();
+    this.chunks = new Map();
+    this.nearLod = quality.shadows === 0 ? 380 : quality.trees >= 1 ? 700 : 520;
   }
 
   city(city) {
@@ -153,6 +155,12 @@ export class BuildingLayer {
     const size = 512;
     const gb = new GeoBuilder({ aLayer: 1, aSeed: 1, aTint: 3 });
     gb.setOrigin(x0, 0, z0);
+    // far level of detail, shown instead of gb beyond NEAR_LOD metres
+    const far = new GeoBuilder({ aLayer: 1, aSeed: 1, aTint: 3 });
+    far.setOrigin(x0, 0, z0);
+    // landmarks stay detailed at any distance
+    const lm = new GeoBuilder({ aLayer: 1, aSeed: 1, aTint: 3 });
+    lm.setOrigin(x0, 0, z0);
     const yard = new GeoBuilder({ aLayer: 1, aTint: 3 });
     yard.setOrigin(x0, 0, z0);
     const marks = new GeoBuilder({ aLayer: 1, aTint: 3 });
@@ -170,11 +178,12 @@ export class BuildingLayer {
       for (const b of cb.list) {
         if (!inside(b.x, b.z)) continue;
         emitBuilding(gb, b);
+        emitBuildingSimple(far, b);
         if (++n % 20 === 0) yield;
       }
       for (const t of cb.trees) if (inside(t.x, t.z)) trees.push(t);
       if (inside(c.x, c.z)) {
-        emitLandmarks(gb, this.world, c, yard);
+        emitLandmarks(lm, this.world, c, yard);
         yield;
       }
     }
@@ -186,6 +195,7 @@ export class BuildingLayer {
       for (const b of v.buildings) {
         if (!inside(b.x, b.z)) continue;
         emitBuilding(gb, b);
+        emitBuildingSimple(far, b);
         if (b.fence) emitFence(gb, b.fence, b.seed);
       }
       for (const t of v.trees) if (inside(t.x, t.z)) trees.push(t);
@@ -196,12 +206,13 @@ export class BuildingLayer {
       if (!inside(lot.x, lot.z)) continue;
       this.registerLot(lot);
       emitLot(gb, yard, marks, lot);
+      for (const s of layoutLot(lot).structures) emitBuildingSimple(far, s);
     }
     chunk.cityTrees = trees;
-    const out = { meshes: [] };
-    const add = (builder, material, cast) => {
+    const out = { meshes: [], near: [], far: [], cx: x0 + size / 2, cz: z0 + size / 2, isNear: true };
+    const add = (builder, material, cast, group) => {
       const geo = builder.build();
-      if (!geo) return;
+      if (!geo) return null;
       const mesh = new THREE.Mesh(geo, material);
       mesh.position.set(x0, 0, z0);
       mesh.castShadow = cast && this.shadows;
@@ -210,14 +221,33 @@ export class BuildingLayer {
       mesh.updateMatrix();
       this.scene.add(mesh);
       out.meshes.push(mesh);
+      group?.push(mesh);
+      return mesh;
     };
-    add(gb, this.material, true);
-    add(yard, this.roadMaterial, false);
-    add(marks, this.markMaterial, false);
+    add(gb, this.material, true, out.near);
+    add(far, this.material, false, out.far);
+    add(lm, this.material, true, null);
+    add(yard, this.roadMaterial, false, null);
+    add(marks, this.markMaterial, false, out.near);
+    for (const m of out.far) m.visible = false;
+    this.chunks.set(chunk.key, out);
     return out;
   }
 
+  // Detailed buildings near the camera, prisms further away.
+  update(camPos) {
+    for (const out of this.chunks.values()) {
+      const d = Math.max(Math.abs(camPos.x - out.cx), Math.abs(camPos.z - out.cz)) - 256;
+      const near = d < this.nearLod;
+      if (near === out.isNear) continue;
+      out.isNear = near;
+      for (const m of out.near) m.visible = near;
+      for (const m of out.far) m.visible = !near;
+    }
+  }
+
   dispose(chunk, out) {
+    this.chunks.delete(chunk.key);
     for (const m of out.meshes) {
       this.scene.remove(m);
       m.geometry.dispose();

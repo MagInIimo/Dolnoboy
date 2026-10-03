@@ -1,7 +1,7 @@
 import { Minimap } from './map.js';
 import { formatMoney } from '../core/util.js';
 import { CARGO, COMPANIES } from '../data/economy.js';
-import { SCALE } from '../core/geo.js';
+import { GAME_HOURS_PER_KM, SCALE } from '../core/geo.js';
 
 export const ICONS = {
   map: '<svg viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg>',
@@ -159,7 +159,7 @@ export class Hud {
     if (route) {
       const realKm = (nav.remaining * SCALE) / 1000;
       this.q('.gd').textContent = realKm >= 10 ? `${Math.round(realKm)} ${t('km')}` : `${realKm.toFixed(1)} ${t('km')}`;
-      const hours = realKm / 70;
+      const hours = realKm * GAME_HOURS_PER_KM;
       const etaMin = Math.round(hours * 60);
       this.q('.gt').textContent = g.targetLabel ?? '';
       this.q('.gt').title = etaMin + ' ' + t('min');

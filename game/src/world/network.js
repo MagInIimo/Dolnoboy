@@ -1,4 +1,4 @@
-import { SpatialHash, clamp, segmentDistance } from '../core/util.js';
+import { clamp } from '../core/util.js';
 
 // Cross sections. Lateral distances from the centre line in metres.
 export const ROAD_TYPES = {
@@ -16,12 +16,17 @@ for (const t of Object.values(ROAD_TYPES)) {
 
 const SEG_CELL = 48;
 const SEG_MUL = 8192;
+const cellKey = (cx, cz) => cx * 100003 + cz;
 
 export class RoadNetwork {
   constructor() {
     this.nodes = [];
     this.edges = [];
-    this.hash = new SpatialHash(SEG_CELL);
+    this.cells = new Map();
+    this.segEdge = new Int32Array(0);
+    this.segI = new Int32Array(0);
+    this.stamps = new Uint32Array(0);
+    this.stamp = 0;
   }
 
   addNode(x, z, props = {}) {
@@ -69,8 +74,12 @@ export class RoadNetwork {
     }
   }
 
+  // Dense segment index on a uniform grid. Queries dedupe with a stamp array instead of allocating sets.
   index() {
-    this.hash = new SpatialHash(SEG_CELL);
+    const segEdge = [];
+    const segI = [];
+    const cells = new Map();
+    const C = SEG_CELL;
     for (const e of this.edges) {
       if (!e.alive) continue;
       const pad = e.type.outerHalf + 2;
@@ -79,31 +88,120 @@ export class RoadNetwork {
         const az = e.zs[i];
         const bx = e.xs[i + 1];
         const bz = e.zs[i + 1];
-        this.hash.insertBox(e.id * SEG_MUL + i, Math.min(ax, bx) - pad, Math.min(az, bz) - pad, Math.max(ax, bx) + pad, Math.max(az, bz) + pad);
+        const id = segEdge.length;
+        segEdge.push(e.id);
+        segI.push(i);
+        const x0 = Math.floor((Math.min(ax, bx) - pad) / C);
+        const x1 = Math.floor((Math.max(ax, bx) + pad) / C);
+        const z0 = Math.floor((Math.min(az, bz) - pad) / C);
+        const z1 = Math.floor((Math.max(az, bz) + pad) / C);
+        for (let cx = x0; cx <= x1; cx++) {
+          for (let cz = z0; cz <= z1; cz++) {
+            const k = cellKey(cx, cz);
+            let list = cells.get(k);
+            if (!list) cells.set(k, (list = []));
+            list.push(id);
+          }
+        }
+      }
+    }
+    this.segEdge = Int32Array.from(segEdge);
+    this.segI = Int32Array.from(segI);
+    this.cells = cells;
+    this.stamps = new Uint32Array(segEdge.length);
+    this.stamp = 0;
+    // compatibility for callers that walk the grid by edge id * 8192 + segment
+    this.hash = { query: (minX, minZ, maxX, maxZ) => this.keysIn(minX, minZ, maxX, maxZ) };
+  }
+
+  keysIn(minX, minZ, maxX, maxZ) {
+    const out = [];
+    const stamp = this.nextStamp();
+    this.eachCell(minX, minZ, maxX, maxZ, (id) => {
+      if (this.stamps[id] === stamp) return;
+      this.stamps[id] = stamp;
+      out.push(this.segEdge[id] * SEG_MUL + this.segI[id]);
+    });
+    return out;
+  }
+
+  nextStamp() {
+    this.stamp = (this.stamp + 1) >>> 0;
+    if (this.stamp === 0) {
+      this.stamps.fill(0);
+      this.stamp = 1;
+    }
+    return this.stamp;
+  }
+
+  eachCell(minX, minZ, maxX, maxZ, fn) {
+    const C = SEG_CELL;
+    const x0 = Math.floor(minX / C);
+    const x1 = Math.floor(maxX / C);
+    const z0 = Math.floor(minZ / C);
+    const z1 = Math.floor(maxZ / C);
+    for (let cx = x0; cx <= x1; cx++) {
+      for (let cz = z0; cz <= z1; cz++) {
+        const list = this.cells.get(cellKey(cx, cz));
+        if (list) for (let k = 0; k < list.length; k++) fn(list[k]);
+      }
+    }
+  }
+
+  // Calls fn(edge, i, t, d, lateral, s, y, bridge, hx, hz) for every segment whose cross-section
+  // (plus extra metres) covers (x, z). No allocations: the hot path of terrain and physics.
+  scan(x, z, extra, fn) {
+    const C = SEG_CELL;
+    const stamp = this.nextStamp();
+    const stamps = this.stamps;
+    const x0 = Math.floor((x - extra) / C);
+    const x1 = Math.floor((x + extra) / C);
+    const z0 = Math.floor((z - extra) / C);
+    const z1 = Math.floor((z + extra) / C);
+    for (let cx = x0; cx <= x1; cx++) {
+      for (let cz = z0; cz <= z1; cz++) {
+        const list = this.cells.get(cellKey(cx, cz));
+        if (!list) continue;
+        for (let k = 0; k < list.length; k++) {
+          const id = list[k];
+          if (stamps[id] === stamp) continue;
+          stamps[id] = stamp;
+          const e = this.edges[this.segEdge[id]];
+          const i = this.segI[id];
+          const ax = e.xs[i];
+          const az = e.zs[i];
+          const dx = e.xs[i + 1] - ax;
+          const dz = e.zs[i + 1] - az;
+          const len2 = dx * dx + dz * dz;
+          let t = len2 > 1e-9 ? ((x - ax) * dx + (z - az) * dz) / len2 : 0;
+          t = t < 0 ? 0 : t > 1 ? 1 : t;
+          const qx = ax + dx * t;
+          const qz = az + dz * t;
+          const d = Math.hypot(x - qx, z - qz);
+          if (d > e.type.outerHalf + extra) continue;
+          const l = Math.sqrt(len2) || 1;
+          const lateral = ((x - qx) * -dz + (z - qz) * dx) / l;
+          const y = e.ys[i] + (e.ys[i + 1] - e.ys[i]) * t;
+          fn(e, i, t, d, lateral, e.ss[i] + (e.ss[i + 1] - e.ss[i]) * t, y, e.bridge[i] && e.bridge[i + 1], dx / l, dz / l);
+        }
       }
     }
   }
 
   // All road segments whose outer cross-section covers (x, z) within extra metres.
   query(x, z, extra = 0) {
-    const ids = this.hash.query(x - extra, z - extra, x + extra, z + extra);
     const out = [];
-    const seen = new Set();
-    for (const key of ids) {
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const e = this.edges[Math.floor(key / SEG_MUL)];
-      const i = key % SEG_MUL;
-      const r = segmentDistance(x, z, e.xs[i], e.zs[i], e.xs[i + 1], e.zs[i + 1]);
-      if (r.d > e.type.outerHalf + extra) continue;
-      const dx = e.xs[i + 1] - e.xs[i];
-      const dz = e.zs[i + 1] - e.zs[i];
-      const l = Math.hypot(dx, dz) || 1;
-      const lateral = ((x - r.x) * -dz + (z - r.z) * dx) / l;
-      const y = e.ys[i] + (e.ys[i + 1] - e.ys[i]) * r.t;
-      out.push({ edge: e, i, t: r.t, d: r.d, lateral, s: e.ss[i] + (e.ss[i + 1] - e.ss[i]) * r.t, y, bridge: e.bridge[i] && e.bridge[i + 1], hx: dx / l, hz: dz / l });
-    }
+    this.scan(x, z, extra, (edge, i, t, d, lateral, s, y, bridge, hx, hz) => out.push({ edge, i, t, d, lateral, s, y, bridge, hx, hz }));
     return out;
+  }
+
+  // True when any road (optionally other than `except`) covers (x, z) within extra metres.
+  any(x, z, extra = 0, except = null) {
+    let hit = false;
+    this.scan(x, z, extra, (edge) => {
+      if (edge !== except) hit = true;
+    });
+    return hit;
   }
 
   nearest(x, z, maxDist = 400, filter = null) {

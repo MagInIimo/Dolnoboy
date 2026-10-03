@@ -1,5 +1,5 @@
 import { CARGO, COMPANIES, BASE_RATE, levelForXp } from '../data/economy.js';
-import { SCALE } from '../core/geo.js';
+import { GAME_HOURS_PER_KM, SCALE } from '../core/geo.js';
 import { hashString, rng } from '../core/util.js';
 
 export function maxDistanceKm(level) {
@@ -50,7 +50,7 @@ export class JobMarket {
         const urgent = r() < 0.18;
         const mass = Math.round((cargo.mass[0] + r() * (cargo.mass[1] - cargo.mass[0])) * 10) / 10;
         const pay = Math.round((3500 + BASE_RATE * km * cargo.rate * (0.92 + r() * 0.2) * (urgent ? 1.3 : 1) * (1 + Math.min(level, 10) * 0.012)) / 100) * 100;
-        const hours = (km / 62) * (urgent ? 1.12 : 1.45) + 2.5;
+        const hours = km * GAME_HOURS_PER_KM * (urgent ? 1.15 : 1.5) + 1.5;
         list.push({
           id: `${cityIndex}-${bucket}-${lot.id}-${k}`,
           cargo: cargoId,

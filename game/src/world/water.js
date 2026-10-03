@@ -7,6 +7,13 @@ const CELL = 256;
 export class WaterBodies {
   constructor(cities) {
     this.cities = cities;
+    // cities by reach (1.6 R) so per-sample damping does not scan every city
+    this.cityHash = new SpatialHash(2048);
+    for (const c of cities) {
+      const r = c.R * 1.7;
+      this.cityHash.insertBox(c, c.x - r, c.z - r, c.x + r, c.z + r);
+    }
+    this.cityList = [];
     this.rivers = [];
     this.seas = [];
     this.hash = new SpatialHash(CELL);
@@ -61,10 +68,13 @@ export class WaterBodies {
 
   coreFactor(x, z) {
     let f = 1;
-    for (const c of this.cities) {
+    const list = this.cityHash.query(x, z, x, z, this.cityList);
+    for (let k = 0; k < list.length; k++) {
+      const c = list[k];
       const d = Math.hypot(x - c.x, z - c.z);
       if (d < c.R * 1.6) f = Math.min(f, smoothstep(c.R * 0.6, c.R * 1.6, d));
     }
+    list.length = 0;
     return f;
   }
 
@@ -187,10 +197,13 @@ export class WaterBodies {
     if (this.seas.length) {
       let sd = this.seaDistance(x, z);
       if (sd !== Infinity) {
-        for (const c of this.cities) {
+        const list = this.cityHash.query(x, z, x, z, this.cityList);
+        for (let k = 0; k < list.length; k++) {
+          const c = list[k];
           const dc = Math.hypot(x - c.x, z - c.z);
           if (dc < c.R * 0.5) sd = Math.max(sd, c.R * 0.5 - dc + 2);
         }
+        list.length = 0;
         if (roadGuard < 40) sd = Math.max(sd, 40 - roadGuard);
         if (sd < 0) h = Math.min(h, W - 1 - clamp(-sd * 0.04, 0, 14));
         else if (sd < 70) h = Math.min(h, W + 0.3 + (h - W - 0.3) * smoothstep(0, 70, sd));

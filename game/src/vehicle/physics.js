@@ -1,4 +1,4 @@
-import { TIME_SCALE, WATER_LEVEL } from '../core/geo.js';
+import { SCALE, WATER_LEVEL } from '../core/geo.js';
 import { angleDiff, clamp, lerp, wrapAngle } from '../core/util.js';
 
 export const GEARS = [14.93, 11.64, 9.02, 7.04, 5.64, 4.4, 3.39, 2.65, 2.05, 1.6, 1.24, 1.0];
@@ -335,7 +335,8 @@ export class TruckPhysics {
     this.odometer += dist;
     const powerKw = (this.engineTorque * torqueCurve(this.rpm) * throttle * this.rpm * 2 * Math.PI) / 60 / 1000;
     this.fuelRate = this.engineOn ? (powerKw * 0.21) / 0.84 / 3600 + 0.0005 : 0;
-    this.fuel = Math.max(0, this.fuel - this.fuelRate * dt * TIME_SCALE * 0.75);
+    // every game metre is SCALE real metres of road, so the tank drains as over the real distance
+    this.fuel = Math.max(0, this.fuel - this.fuelRate * dt * SCALE * 0.75);
     if (this.fuel <= 0) this.engineOn = false;
     this.wheelSpin += (this.v / WHEEL_R) * dt;
     this.trailerWheelSpin += (this.v / 0.5) * dt;

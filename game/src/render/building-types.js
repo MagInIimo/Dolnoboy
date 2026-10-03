@@ -385,3 +385,46 @@ export function tentTower(gb, b, attrs) {
   const F_ = frame(b);
   tentRoof(gb, b, F_, 0, 0, b.w, b.y, b.h, F.roofTin, attrs);
 }
+
+// Far level of detail: one textured prism plus a flat or gabled cap per building (about 10–14 triangles).
+// [floor height, default floors, wall layer, bay width, plinth / ground storey height]
+const SIMPLE = {
+  khrushchevka: [2.75, 5, F.khrushchevka, 3.2, 0.6],
+  panel9: [2.8, 9, F.panelWhite, 3.2, 0.9],
+  panelTower: [2.8, 16, F.panelTower, 3.2, 0.9],
+  stalinka: [3.4, 6, F.stalinkaYellow, 3.6, 0.9],
+  merchant: [3.8, 2, F.merchant, 3.4, 0.5],
+  modern: [3.0, 20, F.modernResidential, 3.4, 4.5],
+  office: [3.7, 14, F.glassBlue, 3.6, 0.5],
+  school: [3.4, 3, F.school, 4.2, 0.5],
+  shop: [4.2, 1, F.shopfront, 4.5, 0],
+  hyper: [9, 1, F.metalShed, 6, 0],
+  garages: [2.6, 1, F.garageDoors, 3.3, 0],
+  izba: [3.0, 1, F.logWall, 2.9, 0.3],
+  cottage: [3.0, 2, F.siding, 3.2, 0.3],
+};
+const PITCHED = new Set(['izba', 'cottage', 'merchant', 'stalinka', 'shed']);
+
+export function emitBuildingSimple(gb, b) {
+  const spec = SIMPLE[b.type];
+  const F_ = frame(b);
+  const a = attrsFor(b, b.tint);
+  let h;
+  let layer;
+  let bay = 3.4;
+  let fh = 3;
+  if (spec) {
+    [fh, , layer, bay] = spec;
+    h = spec[4] + (b.floors ?? spec[1]) * fh;
+    if (b.type !== 'office' && b.type !== 'school' && b.facade !== undefined) layer = b.facade;
+  } else {
+    h = b.height ?? (b.type === 'elevator' ? 38 : b.type === 'tanks' ? 11 : 7);
+    layer = b.type === 'factory' ? F.factoryBrick : b.type === 'tanks' || b.type === 'warehouse' ? F.metalShed : F.concrete;
+    fh = h / 2;
+  }
+  const y0 = b.y - 0.5;
+  const top = b.y + h;
+  prismWalls(gb, b, F_, 0, 0, b.w, b.d, y0, top, layer, bay, fh, a);
+  if (PITCHED.has(b.type)) gableRoof(gb, b, F_, 0, 0, b.w, b.d, top, Math.min(4, b.d * 0.3), b.type === 'stalinka' || b.type === 'merchant' ? F.roofTin : F.roofSlate, layer, a, b.type !== 'izba', 0.3);
+  else flatTop(gb, b, F_, 0, 0, b.w, b.d, top, F.roofFlat, a);
+}

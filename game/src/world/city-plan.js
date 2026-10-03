@@ -2,12 +2,13 @@ import { TAU, hashString, obbOverlap, rng, wrapAngle } from '../core/util.js';
 import { companiesFor } from '../data/economy.js';
 import { WATER_LEVEL } from '../core/geo.js';
 
+// Ring roads as fractions of the city radius: a compact core ring, then rings about every 230 m out to 0.9 R.
 export function ringLayout(R) {
-  if (R >= 700) return [0.17, 0.36, 0.6, 0.88];
-  if (R >= 560) return [0.18, 0.4, 0.7];
-  if (R >= 400) return [0.22, 0.5, 0.8];
-  if (R >= 290) return [0.27, 0.66];
-  return [0.32, 0.72];
+  if (R < 300) return [0.32, 0.72];
+  const n = Math.max(2, Math.min(11, Math.round(R / 230)));
+  const first = Math.min(0.3, Math.max(0.14, Math.min(360, 0.17 * R) / R));
+  const last = 0.9;
+  return Array.from({ length: n }, (_, k) => first + ((last - first) * k) / (n - 1));
 }
 
 const norm = (a) => ((a % TAU) + TAU) % TAU;
@@ -18,7 +19,8 @@ export function planCityStreets(world, city, entries) {
   const R = city.R;
   const random = rng(hashString(city.id) ^ 0x51ab);
   const rings = ringLayout(R);
-  const maxGap = R >= 560 ? 0.72 : R >= 400 ? 0.9 : 1.15;
+  // angular spacing of the through avenues: about 600 m apart at the city edge
+  const maxGap = Math.min(1.15, Math.max(0.3, 600 / R));
   const entryAngles = entries.map((e) => norm(e.angle));
   let main = [...entryAngles].sort((a, b) => a - b);
   if (main.length === 0) main = [0];
@@ -48,7 +50,7 @@ export function planCityStreets(world, city, entries) {
       const b = i + 1 < main.length ? main[i + 1] : main[0] + TAU;
       const arc = (b - a) * rings[k + 1] * R;
       if (arc > 300) {
-        const parts = Math.min(3, Math.floor(arc / 260));
+        const parts = Math.min(6, Math.floor(arc / 260));
         for (let p = 1; p <= parts; p++) {
           const m = norm(a + ((b - a) * p) / (parts + 1));
           extras.push({ angle: m, k });
@@ -85,7 +87,7 @@ export function planCityStreets(world, city, entries) {
       const nb = node(k, norm(b));
       const ra = Math.hypot(na.x - city.x, na.z - city.z);
       const rb = Math.hypot(nb.x - city.x, nb.z - city.z);
-      const steps = Math.max(3, Math.ceil(((b - a) * frac * R) / 7));
+      const steps = Math.max(3, Math.ceil(((b - a) * frac * R) / 12));
       const pts = [];
       for (let j = 0; j <= steps; j++) {
         const t = j / steps;
@@ -102,13 +104,13 @@ export function planCityStreets(world, city, entries) {
     for (let k = 0; k < rings.length - 1; k++) {
       const na = node(k, a);
       const nb = node(k + 1, a);
-      created.push(net.addEdge(na, nb, straight(na, nb, 7), isEntry ? 'A' : 'S', { city: city.index, role: 'radial', avenue: isEntry }));
+      created.push(net.addEdge(na, nb, straight(na, nb, 16), isEntry ? 'A' : 'S', { city: city.index, role: 'radial', avenue: isEntry }));
     }
   }
   for (const { angle, k } of extras) {
     const na = node(k, angle);
     const nb = node(k + 1, angle);
-    created.push(net.addEdge(na, nb, straight(na, nb, 7), 'S', { city: city.index, role: 'radial' }));
+    created.push(net.addEdge(na, nb, straight(na, nb, 16), 'S', { city: city.index, role: 'radial' }));
   }
   const entryNodes = [];
   for (const entry of entries) {
@@ -117,7 +119,7 @@ export function planCityStreets(world, city, entries) {
     const x = city.x + Math.sin(a) * city.Rout;
     const z = city.z + Math.cos(a) * city.Rout;
     const en = net.addNode(x, z, { city: city.index, entry: true, angle: a });
-    const stub = net.addEdge(inner, en, straight(inner, en, 6), 'A', { city: city.index, role: 'stub', avenue: true });
+    const stub = net.addEdge(inner, en, straight(inner, en, 16), 'A', { city: city.index, role: 'stub', avenue: true });
     created.push(stub);
     entryNodes.push({ key: entry.key, node: en, stub, angle: a });
   }

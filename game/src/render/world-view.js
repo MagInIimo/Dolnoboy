@@ -103,6 +103,13 @@ export class WorldView {
     return this.queue.length + (this.active ? 1 : 0);
   }
 
+  // Chunks closer than dist that are not built yet (the start can begin once these are ready).
+  pendingWithin(dist) {
+    let n = this.active && this.active.chunk.d < dist ? 1 : 0;
+    for (const c of this.queue) if (c.d < dist) n++;
+    return n;
+  }
+
   *buildChunk(chunk) {
     const lod = chunk.wantLod;
     const t = yield* buildTerrain(this.world, chunk.x0, chunk.z0, CHUNK, lod);

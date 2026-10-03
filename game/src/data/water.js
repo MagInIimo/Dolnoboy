@@ -1,4 +1,4 @@
-// River centre lines [lat, lon, width?]; widths in game metres, exaggerated for readability at 1:40.
+// River centre lines [lat, lon, width?]; widths in game metres (1:10 map scale, wide rivers slightly exaggerated).
 export const RIVERS = [
   {
     id: 'volga', ru: 'Волга', en: 'Volga', width: 120,

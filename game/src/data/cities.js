@@ -75,8 +75,39 @@ export const CITIES = RAW.map(([id, ru, en, lat, lon, pop, region, landmarks], i
 
 export const CITY_BY_ID = Object.fromEntries(CITIES.map((c) => [c.id, c]));
 
+// Desired built-up radius in game metres at 1:10 (close to the real size); neighbours may shrink it.
 export function cityRadius(pop) {
-  if (pop >= 10000) return 760;
-  if (pop >= 5000) return 600;
-  return Math.round(Math.min(470, 175 + Math.sqrt(pop) * 8.2));
+  const cap = pop >= 10000 ? 2400 : pop >= 5000 ? 2000 : 1500;
+  return Math.round(Math.min(cap, 260 + Math.sqrt(pop) * 28));
+}
+
+// Width of the suburban fringe between the last ring road and the city limit.
+export function fringeWidth(R) {
+  return R >= 800 ? 380 : R >= 400 ? 280 : 200;
+}
+
+// Radii shrunk so that neighbouring cities keep a stretch of open highway between them.
+// The smaller city gives way first (down to 60% of its wish), then the bigger one.
+export function fitRadii(cities) {
+  const R = cities.map((c) => cityRadius(c.pop));
+  const floor = R.map((r) => r * 0.6);
+  for (let iter = 0; iter < 80; iter++) {
+    let changed = false;
+    for (let i = 0; i < cities.length; i++) {
+      for (let j = i + 1; j < cities.length; j++) {
+        const d = Math.hypot(cities[i].x - cities[j].x, cities[i].z - cities[j].z);
+        const gap = Math.max(700, d * 0.16);
+        let over = R[i] + R[j] + fringeWidth(R[i]) + fringeWidth(R[j]) + gap - d;
+        if (over <= 0) continue;
+        changed = true;
+        const [a, b] = cities[i].pop < cities[j].pop ? [i, j] : [j, i];
+        const take = Math.min(over, Math.max(0, R[a] - floor[a]));
+        R[a] -= take;
+        over -= take;
+        if (over > 0) R[b] = Math.max(floor[b], R[b] - over);
+      }
+    }
+    if (!changed) break;
+  }
+  return R.map((r) => Math.round(r));
 }

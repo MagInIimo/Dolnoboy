@@ -1,5 +1,9 @@
-export const SCALE = 40;
-export const TIME_SCALE = 40;
+// One game metre stands for SCALE real metres along the map (1:10). Trucks, roads and buildings stay real size.
+export const SCALE = 10;
+// Game clock: one real second is TIME_SCALE game seconds (a day lasts 72 real minutes).
+export const TIME_SCALE = 20;
+// Game hours a truck needs per real kilometre of route at an average 62 km/h.
+export const GAME_HOURS_PER_KM = TIME_SCALE / (SCALE * 62);
 export const WATER_LEVEL = -2;
 
 const R = 6371000;
