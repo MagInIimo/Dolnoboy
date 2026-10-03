@@ -78,6 +78,9 @@ export function facadeArray(size, baked = {}) {
   return { color: make(data, true), normal: make(ndata, false) };
 }
 
+// Night window light per facade (shop windows and offices glow softer than flats).
+const NIGHT_LIGHT = { shopfront: 0.5, glassBlue: 0.55, glassDark: 0.5, school: 0.3, metalShed: 0.4, warehouseDock: 0.4, factoryBrick: 0.5 };
+
 export function buildingMaterial(facades) {
   const pbr = FACADES.map((name) => FACADE_PBR[name] ?? [0.9, 0.12, 0.0]);
   const uniforms = { uFacade: { value: facades.color }, uFacadeN: { value: facades.normal }, uNight: { value: 0 } };
@@ -111,6 +114,7 @@ export function buildingMaterial(facades) {
       varying vec2 vFUv;
       ${GLSL_HASH}
       const vec3 PBR[${pbr.length}] = vec3[${pbr.length}](${pbr.map((p) => `vec3(${p.map((v) => v.toFixed(2)).join(',')})`).join(',')});
+      const float NIGHT[${pbr.length}] = float[${pbr.length}](${FACADES.map((n) => (NIGHT_LIGHT[n] ?? 1.1).toFixed(2)).join(',')});
     `,
     fragmentMap: `
       float layerIdx = floor(vLayer + 0.5);
@@ -130,12 +134,13 @@ export function buildingMaterial(facades) {
     fragmentMetalness: 'float metalnessFactor = pbrv.z * (1.0 - glassMask * 0.7);',
     fragmentEmissive: `
       {
+        // some windows lit at night; the light takes the colour of curtains and blinds
         vec2 cell = floor(vFUv + 0.0001);
         float h = hash12(cell * 1.37 + vec2(vSeed * 0.71, vSeed * 0.13));
-        float on = step(0.48, h) * step(0.5, glassMask);
-        vec3 warm = mix(vec3(1.0, 0.72, 0.38), vec3(0.78, 0.86, 1.0), step(0.86, fract(h * 9.7)));
-        warm *= 0.6 + 0.6 * fract(h * 31.3);
-        totalEmissiveRadiance += warm * on * uNight * 1.35;
+        float on = step(0.6, h) * step(0.5, glassMask);
+        vec3 warm = mix(vec3(1.0, 0.68, 0.36), vec3(0.75, 0.84, 1.0), step(0.9, fract(h * 9.7)));
+        warm *= (0.35 + 0.55 * fract(h * 31.3)) * mix(vec3(1.0), clamp(fac.rgb * 2.2, 0.25, 1.4), 0.6);
+        totalEmissiveRadiance += warm * on * uNight * NIGHT[int(layerIdx)];
       }
     `,
   });
