@@ -6,6 +6,7 @@ import { BuildingLayer, buildingMaterial, facadeArray } from '../render/building
 import { TreeSystem } from '../render/trees.js';
 import { Truck } from '../vehicle/truck.js';
 import { loadTractorAsset } from '../vehicle/truck-glb.js';
+import { loadCarModels } from '../traffic/car-models.js';
 import { buildTrailer } from '../vehicle/trailer-model.js';
 import { CameraRig, Mirrors } from '../render/camera-rig.js';
 import { Input } from '../core/input.js';
@@ -52,7 +53,7 @@ export class Game {
     const engine = new Engine(this.frame, s.settings.quality);
     this.engine = engine;
     L.stage('loadingTextures', 0.35);
-    const [photos] = await Promise.all([loadPhotoTextures((p) => L.stage('loadingTextures', 0.35 + p * 0.15)), loadTractorAsset()]);
+    const [photos] = await Promise.all([loadPhotoTextures((p) => L.stage('loadingTextures', 0.35 + p * 0.15)), loadTractorAsset(), loadCarModels()]);
     const texSize = engine.quality.texture;
     this.surfaces = new SurfaceMaterials(buildSurfaceArrays(photos, texSize), macroNoiseTexture(), s.settings.quality);
     engine.attachSurfaces(this.surfaces);
@@ -360,6 +361,19 @@ export class Game {
     return pt ? { x: Math.round(pt.x), z: Math.round(pt.z) } : null;
   }
 
+  // QA only: a camera orbiting a traffic car (or a fixed point), set from headless scenarios.
+  applyDebugView() {
+    const v = this.debugView;
+    const cam = this.engine.camera;
+    const car = v.car;
+    const tx = car ? car.x : v.x;
+    const ty = (car ? car.y : v.y) + (v.ty ?? 0.8);
+    const tz = car ? car.z : v.z;
+    const yaw = (car ? car.yaw : 0) + (v.yaw ?? 0.6);
+    cam.position.set(tx + Math.sin(yaw) * (v.dist ?? 7), ty + (v.h ?? 0.8), tz + Math.cos(yaw) * (v.dist ?? 7));
+    cam.lookAt(tx, ty, tz);
+  }
+
   // After a jump (tow truck, preview) the surroundings are built before play resumes.
   async settle(dist = 600) {
     this.settling = true;
@@ -375,6 +389,7 @@ export class Game {
       if (this.view.pendingWithin(dist) === 0) break;
       await new Promise((r) => setTimeout(r, 0));
     }
+    this.traffic.repopulate(p.x, p.z);
     this.hud.setBusy(null);
     this.settling = false;
     this.rig.ready = false;
@@ -1074,6 +1089,7 @@ export class Game {
       const night = this.engine.env.nightFactor;
       this.truck.update(dt, night, this.rig.mode === 'cab');
       this.rig.update(dt);
+      if (this.debugView) this.applyDebugView();
       const focus = this.focusVec ?? (this.focusVec = new THREE.Vector3());
       focus.set(p.x, p.y, p.z);
       this.engine.update(this.running ? dt : 0, focus);

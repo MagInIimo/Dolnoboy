@@ -3,16 +3,17 @@ import { GeoBuilder } from '../render/geo-builder.js';
 import { computeNodeInfo } from '../render/road-builder.js';
 import { signalPhase } from '../world/signals.js';
 import { SpatialHash, angleDiff, clamp, rng, wrapAngle } from '../core/util.js';
+import { carModels, vehicleMaterial } from './car-models.js';
 
 // Vehicle kinds: size in metres, speed factor relative to the limit, spawn weight.
 const KINDS = {
-  sedan: { len: 4.6, wid: 1.8, vmul: 1.0, weight: 5, accel: 2.2 },
-  hatch: { len: 4.0, wid: 1.72, vmul: 1.0, weight: 4, accel: 2.2 },
-  suv: { len: 4.7, wid: 1.9, vmul: 1.02, weight: 3, accel: 2.0 },
-  van: { len: 5.6, wid: 2.05, vmul: 0.92, weight: 2, accel: 1.6 },
-  lorry: { len: 8.6, wid: 2.5, vmul: 0.82, weight: 2, accel: 1.0, truck: true },
-  bus: { len: 11.5, wid: 2.55, vmul: 0.78, weight: 1, accel: 1.1, truck: true, city: true },
-  police: { len: 4.6, wid: 1.8, vmul: 1.02, weight: 0.25, accel: 2.4, police: true },
+  sedan: { len: 4.42, wid: 1.77, vmul: 1.0, weight: 5, accel: 2.2 },
+  hatch: { len: 4.1, wid: 1.74, vmul: 1.0, weight: 4, accel: 2.2 },
+  suv: { len: 4.33, wid: 1.8, vmul: 1.02, weight: 3, accel: 2.0 },
+  van: { len: 5.63, wid: 2.07, vmul: 0.92, weight: 2, accel: 1.6 },
+  lorry: { len: 8.0, wid: 2.48, vmul: 0.82, weight: 2, accel: 1.0, truck: true },
+  bus: { len: 12.0, wid: 2.55, vmul: 0.78, weight: 1, accel: 1.1, truck: true, city: true },
+  police: { len: 4.42, wid: 1.77, vmul: 1.02, weight: 0.25, accel: 2.4, police: true },
 };
 const KIND_IDS = Object.keys(KINDS);
 const PAINT = [0xe9ebe8, 0xe9ebe8, 0xb7bcc0, 0x8d949a, 0x1a1c1f, 0x2b3f66, 0x7a1f1d, 0x9a2d22, 0x2f4a36, 0xc9b99a, 0x4f5a63, 0x1f5c8a];
@@ -23,128 +24,45 @@ const STOP_GAP = 2.2;
 const DECEL = 3.6;
 const HARD_DECEL = 7;
 
-// ---------- procedural low-poly bodies (forward +z, origin on the ground at the centre) ----------
+// ---------- simple bodies, used only when the Blender models fail to load (forward +z, origin on the ground) ----------
+// Attributes match car-models.js: colour and aMat = (roughness, metalness, paint, lamp id).
 
-function wheel(gb, x, y, z, r, w) {
-  const n = 10;
-  const a = { color: [0.07, 0.07, 0.08], aPaint: 0 };
-  const ring = [];
-  for (let i = 0; i <= n; i++) {
-    const t = (i / n) * Math.PI * 2;
-    ring.push([Math.sin(t), Math.cos(t)]);
-  }
-  for (let i = 0; i < n; i++) {
-    const [s0, c0] = ring[i];
-    const [s1, c1] = ring[i + 1];
-    gb.face([x - w / 2, y + c0 * r, z + s0 * r], [x + w / 2, y + c0 * r, z + s0 * r], [x + w / 2, y + c1 * r, z + s1 * r], [x - w / 2, y + c1 * r, z + s1 * r], null, a);
-  }
-  for (const side of [-1, 1]) {
-    const cx = x + (side * w) / 2;
-    const hub = { color: [0.55, 0.57, 0.6], aPaint: 0 };
-    for (let i = 0; i < n; i++) {
-      const [s0, c0] = ring[i];
-      const [s1, c1] = ring[i + 1];
-      const p0 = [cx, y, z];
-      const p1 = [cx, y + c0 * r * 0.62, z + s0 * r * 0.62];
-      const p2 = [cx, y + c1 * r * 0.62, z + s1 * r * 0.62];
-      if (side > 0) gb.face(p0, p1, p2, p2, null, hub);
-      else gb.face(p0, p2, p1, p1, null, hub);
-    }
-  }
-}
+const paint = { color: [1, 1, 1], aMat: [0.3, 0.4, 1, 0] };
+const glass = { color: [0.02, 0.025, 0.03], aMat: [0.05, 0.1, 0, 0] };
+const plastic = { color: [0.04, 0.04, 0.045], aMat: [0.7, 0, 0, 0] };
+const white = { color: [0.8, 0.8, 0.78], aMat: [0.5, 0, 0, 0] };
+const tyre = { color: [0.03, 0.03, 0.03], aMat: [0.9, 0, 0, 0] };
+const headLamp = { color: [0.6, 0.62, 0.66], aMat: [0.1, 0.6, 0, 1] };
+const tailLamp = { color: [0.3, 0.02, 0.02], aMat: [0.15, 0.2, 0, 2] };
 
-const paint = { color: [1, 1, 1], aPaint: 1 };
-const glass = { color: [0.06, 0.08, 0.1], aPaint: 0 };
-const plastic = { color: [0.1, 0.1, 0.11], aPaint: 0 };
-const white = { color: [0.9, 0.9, 0.88], aPaint: 0 };
-const chrome = { color: [0.7, 0.72, 0.74], aPaint: 0 };
-
-function bodyGeometry(kind) {
+function simpleGeometry(kind) {
   const k = KINDS[kind];
-  const gb = new GeoBuilder({ color: 3, aPaint: 1 });
+  const gb = new GeoBuilder({ color: 3, aMat: 4 });
   const L = k.len;
   const W = k.wid;
   const box = (x, y, z, w, h, d, a) => gb.box(x, y, z, w, h, d, 0, a);
-  if (kind === 'sedan' || kind === 'hatch' || kind === 'suv' || kind === 'police') {
-    const suv = kind === 'suv';
-    const base = suv ? 0.42 : 0.3;
-    const bodyH = suv ? 0.82 : 0.66;
-    const r = suv ? 0.37 : 0.31;
-    box(0, base + bodyH / 2, 0, W, bodyH, L - 0.1, paint);
-    const cabLen = kind === 'hatch' ? L * 0.56 : suv ? L * 0.62 : L * 0.46;
-    const cabZ = kind === 'hatch' ? -L * 0.12 : suv ? -L * 0.08 : -L * 0.06;
-    const cabH = suv ? 0.56 : 0.48;
-    box(0, base + bodyH + cabH / 2, cabZ, W - 0.14, cabH, cabLen, glass);
-    box(0, base + bodyH + cabH + 0.03, cabZ, W - 0.18, 0.07, cabLen - 0.25, paint);
-    box(0, base + 0.14, L / 2 - 0.05, W + 0.02, 0.26, 0.14, plastic);
-    box(0, base + 0.14, -L / 2 + 0.05, W + 0.02, 0.26, 0.14, plastic);
-    box(0, base + bodyH * 0.55, L / 2 - 0.02, W * 0.4, 0.18, 0.06, plastic);
-    for (const z of [L / 2 - 0.85, -L / 2 + 0.85]) for (const x of [-W / 2 + 0.12, W / 2 - 0.12]) wheel(gb, x, r, z, r, 0.22);
-    if (kind === 'police') {
-      // traffic police livery: blue band along the sides and a light bar base on the roof
-      const blue = { color: [0.08, 0.25, 0.62], aPaint: 0 };
-      for (const side of [-1, 1]) box(side * (W / 2 + 0.005), base + bodyH * 0.55, 0, 0.02, 0.2, L - 0.5, blue);
-      box(0, base + bodyH + cabH + 0.1, cabZ, 1.2, 0.08, 0.3, plastic);
-    }
-  } else if (kind === 'van') {
-    box(0, 0.75, L / 2 - 1.0, W, 0.9, 2.0, paint);
-    box(0, 1.55, L / 2 - 1.15, W - 0.1, 0.7, 1.7, glass);
-    box(0, 1.95, L / 2 - 1.2, W - 0.1, 0.1, 1.6, paint);
-    box(0, 1.55, -0.95, W + 0.05, 2.0, L - 2.25, white);
-    box(0, 0.45, 0, 0.9, 0.2, L - 0.6, plastic);
-    box(0, 0.4, L / 2 - 0.02, W, 0.26, 0.1, plastic);
-    for (const z of [L / 2 - 0.9, -L / 2 + 1.1]) for (const x of [-W / 2 + 0.15, W / 2 - 0.15]) wheel(gb, x, 0.36, z, 0.36, 0.24);
-  } else if (kind === 'lorry') {
-    box(0, 1.55, L / 2 - 1.1, W, 1.9, 2.2, paint);
-    box(0, 2.15, L / 2 - 0.02, W - 0.2, 0.8, 0.06, glass);
-    box(0, 0.75, L / 2 - 0.05, W - 0.2, 0.35, 0.12, plastic);
-    box(0, 2.0, -1.15, W + 0.02, 2.6, L - 2.5, white);
-    box(0, 0.62, -0.5, 1.0, 0.3, L - 1.2, plastic);
-    for (const z of [L / 2 - 1.2, -L / 2 + 1.6, -L / 2 + 2.7]) for (const x of [-W / 2 + 0.2, W / 2 - 0.2]) wheel(gb, x, 0.5, z, 0.5, 0.3);
+  const truck = kind === 'lorry' || kind === 'bus';
+  const r = truck ? 0.5 : kind === 'van' ? 0.35 : 0.31;
+  if (truck) {
+    box(0, 1.6, 0, W, 2.6, L, kind === 'bus' ? paint : white);
+    box(0, 2.1, L / 2 - 0.01, W - 0.2, 0.9, 0.04, glass);
   } else {
-    box(0, 0.95, 0, W, 1.1, L, paint);
-    box(0, 2.0, 0, W, 1.0, L - 0.2, glass);
-    box(0, 2.0, L / 2 - 0.02, W - 0.1, 1.2, 0.05, glass);
-    box(0, 2.65, 0, W, 0.3, L, white);
-    box(0, 2.9, -L * 0.2, W * 0.7, 0.25, L * 0.3, chrome);
-    for (const z of [L / 2 - 2.4, -L / 2 + 3.0]) for (const x of [-W / 2 + 0.18, W / 2 - 0.18]) wheel(gb, x, 0.5, z, 0.5, 0.3);
+    const h = kind === 'van' ? 1.9 : kind === 'suv' ? 1.25 : 1.05;
+    box(0, 0.25 + h / 2 - 0.1, 0, W, h - 0.2, L - 0.1, paint);
+    box(0, 0.25 + h - 0.05, -0.2, W - 0.2, 0.42, L * 0.5, glass);
+  }
+  box(0, 0.7, L / 2, W - 0.1, 0.12, 0.04, plastic);
+  for (const z of [L / 2 - 0.9, -L / 2 + 1.1]) for (const x of [-W / 2 + 0.15, W / 2 - 0.15]) box(x, r, z, 0.24, r * 2, r * 2, tyre);
+  for (const sx of [-1, 1]) {
+    box(sx * (W / 2 - 0.3), 0.8, L / 2 + 0.01, 0.34, 0.14, 0.03, headLamp);
+    box(sx * (W / 2 - 0.22), 0.85, -L / 2 - 0.01, 0.26, 0.14, 0.03, tailLamp);
+    box(sx * (W / 2 - 0.05), 0.7, L / 2 - 0.1, 0.04, 0.06, 0.1, { color: [0.6, 0.3, 0.03], aMat: [0.2, 0, 0, sx > 0 ? 3 : 4] });
+  }
+  if (kind === 'police') {
+    box(0.28, 1.5, -0.3, 0.5, 0.1, 0.22, { color: [0.05, 0.1, 0.5], aMat: [0.2, 0, 0, 5] });
+    box(-0.28, 1.5, -0.3, 0.5, 0.1, 0.22, { color: [0.5, 0.03, 0.03], aMat: [0.2, 0, 0, 6] });
   }
   return gb.build();
-}
-
-function lampGeometry(kind, front) {
-  const k = KINDS[kind];
-  const gb = new GeoBuilder({});
-  const z = front ? k.len / 2 + 0.03 : -k.len / 2 - 0.03;
-  const y = kind === 'lorry' ? (front ? 0.95 : 0.85) : kind === 'bus' ? 0.75 : kind === 'van' ? 0.85 : kind === 'suv' ? 0.95 : 0.78;
-  const x = k.wid / 2 - (front ? 0.3 : 0.22);
-  const w = front ? 0.34 : 0.26;
-  const h = front ? 0.16 : 0.15;
-  for (const sx of [-x, x]) {
-    if (front) gb.face([sx + w / 2, y - h / 2, z], [sx - w / 2, y - h / 2, z], [sx - w / 2, y + h / 2, z], [sx + w / 2, y + h / 2, z]);
-    else gb.face([sx - w / 2, y - h / 2, z], [sx + w / 2, y - h / 2, z], [sx + w / 2, y + h / 2, z], [sx - w / 2, y + h / 2, z]);
-  }
-  return gb.build();
-}
-
-function paintedMaterial() {
-  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.42, metalness: 0.35 });
-  m.onBeforeCompile = (shader) => {
-    shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nattribute float aPaint;').replace(
-      '#include <color_vertex>',
-      `#if defined( USE_COLOR ) || defined( USE_INSTANCING_COLOR )
-        vColor = vec3( 1.0 );
-      #endif
-      #ifdef USE_COLOR
-        vColor *= color;
-      #endif
-      #ifdef USE_INSTANCING_COLOR
-        vColor.xyz = mix( vColor.xyz, vColor.xyz * instanceColor.xyz, aPaint );
-      #endif`
-    );
-  };
-  m.customProgramCacheKey = () => 'traffic-paint';
-  return m;
 }
 
 // ---------- traffic simulation ----------
@@ -167,41 +85,60 @@ export class Traffic {
     world.colliders = world.colliders ?? new SpatialHash(32);
     this.byEdge = new Map();
     this.inJunction = new Map();
-    // instanced meshes per kind
-    const mat = paintedMaterial();
-    this.frontMat = new THREE.MeshBasicMaterial({ toneMapped: false });
-    this.rearMat = new THREE.MeshBasicMaterial({ toneMapped: false });
-    this.meshes = {};
+    // instanced meshes per kind: detailed models near the camera, simplified ones further away
+    const models = carModels();
+    this.material = vehicleMaterial(quality.shadows > 0);
+    this.nearDist = quality.shadows === 0 ? 28 : quality.shadows >= 2048 ? 90 : 60;
     const cap = this.maxCars;
-    for (const kind of KIND_IDS) {
-      const body = new THREE.InstancedMesh(bodyGeometry(kind), mat, cap);
-      body.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3).fill(1), 3);
-      const front = new THREE.InstancedMesh(lampGeometry(kind, true), this.frontMat, cap);
-      front.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3);
-      const rear = new THREE.InstancedMesh(lampGeometry(kind, false), this.rearMat, cap);
-      rear.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3);
-      for (const m of [body, front, rear]) {
-        m.count = 0;
-        m.frustumCulled = false;
-        engine.scene.add(m);
+    const nearCap = Math.min(cap, 24);
+    const make = (geo, n, lamps) => {
+      const m = new THREE.InstancedMesh(geo, this.material, n);
+      if (lamps) {
+        m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n * 3).fill(1), 3);
+        geo.setAttribute('aLamp', new THREE.InstancedBufferAttribute(new Float32Array(n * 4), 4));
+        geo.setAttribute('aBeacon', new THREE.InstancedBufferAttribute(new Float32Array(n * 2), 2));
       }
-      body.castShadow = quality.shadows > 0;
-      body.receiveShadow = true;
-      this.meshes[kind] = { body, front, rear };
-    }
-    // police light bars (left blue, right red) and warning triangles of accident scenes
-    const bar = (x) => {
-      const g = new THREE.BoxGeometry(0.46, 0.12, 0.24);
-      g.translate(x, 1.66, -0.28);
-      const m = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ toneMapped: false }), cap);
-      m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3);
       m.count = 0;
+      m.visible = false;
       m.frustumCulled = false;
+      m.castShadow = quality.shadows > 0;
+      m.receiveShadow = true;
       engine.scene.add(m);
       return m;
     };
-    this.beaconL = bar(-0.27);
-    this.beaconR = bar(0.27);
+    this.meshes = {};
+    this.counts = {};
+    for (const kind of KIND_IDS) {
+      const src = models?.kinds[kind];
+      this.meshes[kind] = { lo: make(src?.lo ?? simpleGeometry(kind), cap, true), hi: src?.hi ? make(src.hi, nearCap, true) : null, spec: src?.spec ?? null };
+      this.counts[kind] = { hi: 0, lo: 0 };
+    }
+    this.wheels = {};
+    for (const [name, w] of Object.entries(models?.wheels ?? {})) this.wheels[name] = { mesh: make(w.geo, nearCap * 4, false), w: w.spec.w, n: 0 };
+    // soft contact shadow under every vehicle (cheap ambient occlusion)
+    const n = 64;
+    const px = new Uint8Array(n * n * 4);
+    for (let y = 0; y < n; y++)
+      for (let x = 0; x < n; x++) {
+        const u = Math.abs((x + 0.5) / n - 0.5) * 2;
+        const v = Math.abs((y + 0.5) / n - 0.5) * 2;
+        const d = Math.pow(Math.pow(u, 4) + Math.pow(v, 4), 0.25);
+        px[(y * n + x) * 4 + 3] = Math.round(255 * Math.max(0, Math.min(1, (1 - d) / 0.45)) ** 1.5);
+      }
+    const shadowTex = new THREE.DataTexture(px, n, n);
+    shadowTex.needsUpdate = true;
+    shadowTex.magFilter = THREE.LinearFilter;
+    shadowTex.minFilter = THREE.LinearFilter;
+    const shadowGeo = new THREE.PlaneGeometry(1, 1);
+    shadowGeo.rotateX(-Math.PI / 2);
+    this.shadows = new THREE.InstancedMesh(shadowGeo, new THREE.MeshBasicMaterial({ color: 0x000000, map: shadowTex, transparent: true, opacity: 0.62, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }), cap);
+    this.shadows.count = 0;
+    this.shadows.frustumCulled = false;
+    this.shadows.renderOrder = 1;
+    engine.scene.add(this.shadows);
+    this.local = new THREE.Matrix4();
+    this.euler = new THREE.Euler(0, 0, 0, 'YXZ');
+    this.scale = new THREE.Vector3(1, 1, 1);
     const tri = new THREE.Shape([new THREE.Vector2(-0.4, 0), new THREE.Vector2(0.4, 0), new THREE.Vector2(0, 0.7)]);
     const triGeo = new THREE.ShapeGeometry(tri);
     triGeo.translate(0, 0.12, 0);
@@ -330,6 +267,17 @@ export class Traffic {
     const r = car.spec.len / 2 + 0.5;
     car.box = [car.x - r, car.z - r, car.x + r, car.z + r];
     this.world.colliders.insertBox(c, car.box[0], car.box[1], car.box[2], car.box[3]);
+  }
+
+  // After a jump (tow, preview): drop the old population and fill the new surroundings at once.
+  repopulate(px, pz) {
+    for (const car of this.cars) this.removeCar(car);
+    this.cars = [];
+    this.scenes = [];
+    this.inJunction.clear();
+    this.filled = false;
+    for (let k = 0; k < 400 && this.cars.length < this.maxCars; k++) this.trySpawn(px, pz, 30);
+    this.filled = this.cars.length >= this.maxCars * 0.8;
   }
 
   removeCar(car) {
@@ -849,6 +797,7 @@ export class Traffic {
     }
     // advance
     const ds = car.v * dt;
+    car.roll = ((car.roll ?? 0) + ds) % 6283.2;
     if (car.mode === 'edge') {
       const stopBefore = this.toStopLine(car);
       car.s += car.dir * ds;
@@ -960,59 +909,104 @@ export class Traffic {
   }
 
   // ---------- rendering ----------
+  // Indicator side: +1 left, -1 right, 0 off (lane changes, turns at the next junction, hazards elsewhere).
+  indicator(car) {
+    if (car.mode === 'edge') {
+      const d = car.latTarget - car.lat;
+      if (Math.abs(d) > 0.4) return d > 0 ? -1 : 1;
+      if ((this.endS(car) - car.s) * car.dir > 45) return 0;
+    } else if (car.mode !== 'turn') return 0;
+    const turn = car.next?.turn ?? 0;
+    return Math.abs(turn) > 0.5 && Math.abs(turn) < 3 ? Math.sign(turn) : 0;
+  }
+
+  placeWheels(car, spec, base) {
+    const W = this.wheels[spec.wheel];
+    if (!W) return;
+    const angle = (car.roll ?? 0) / spec.r;
+    const steer = car.steer ?? 0;
+    for (const [x, y, z, front, width] of spec.wheels) {
+      if (W.n >= W.mesh.instanceMatrix.count) return;
+      const left = x > 0;
+      this.euler.set(left ? angle : -angle, (front ? steer : 0) + (left ? 0 : Math.PI), 0);
+      this.quat.setFromEuler(this.euler);
+      this.vec.set(x, y, z);
+      this.scale.set(width ? width / W.w : 1, 1, 1);
+      this.local.compose(this.vec, this.quat, this.scale);
+      this.local.premultiply(base);
+      W.mesh.setMatrixAt(W.n++, this.local);
+    }
+  }
+
   update(dt, camPos, night) {
-    const counts = {};
-    for (const k of KIND_IDS) counts[k] = 0;
     const m = this.matrix;
-    const front = night > 0.25 ? 1.6 : 0.18;
+    const head = night > 0.25 ? 1.8 : 0.35;
+    const tailBase = night > 0.25 ? 0.7 : 0;
     const blink = this.clock % 0.8 < 0.42;
     const flash = Math.floor(this.clock * 6) % 4;
-    let beacons = 0;
+    for (const k of KIND_IDS) this.counts[k].hi = this.counts[k].lo = 0;
+    for (const w of Object.values(this.wheels)) w.n = 0;
+    const near2 = this.nearDist * this.nearDist;
+    let shadowCount = 0;
     for (const car of this.cars) {
+      // front wheel steering from the yaw rate
+      if (dt > 0) {
+        const rate = car.prevYaw === undefined ? 0 : angleDiff(car.yaw, car.prevYaw) / dt;
+        const target = car.v > 0.5 ? clamp(Math.atan((rate * car.spec.len * 0.6) / car.v), -0.55, 0.55) : car.steer ?? 0;
+        car.steer = (car.steer ?? 0) + (target - (car.steer ?? 0)) * Math.min(1, dt * 6);
+      }
+      car.prevYaw = car.yaw;
       const M = this.meshes[car.kind];
-      const i = counts[car.kind]++;
+      const C = this.counts[car.kind];
+      const dx = car.x - camPos.x;
+      const dz = car.z - camPos.z;
+      const hi = !!M.hi && dx * dx + dz * dz < near2 && C.hi < M.hi.instanceMatrix.count;
+      const mesh = hi ? M.hi : M.lo;
+      const i = hi ? C.hi++ : C.lo++;
       this.quat.setFromAxisAngle(this.axisY, car.yaw);
       this.vec.set(car.x, car.y + 0.02, car.z);
       m.compose(this.vec, this.quat, this.one);
-      M.body.setMatrixAt(i, m);
-      M.front.setMatrixAt(i, m);
-      M.rear.setMatrixAt(i, m);
+      mesh.setMatrixAt(i, m);
       this.color.setHex(car.color);
-      M.body.instanceColor.setXYZ(i, this.color.r, this.color.g, this.color.b);
-      if (car.hazard) {
-        const k = blink ? 2.2 : 0.15;
-        M.front.instanceColor.setXYZ(i, k, k * 0.55, k * 0.05);
-        M.rear.instanceColor.setXYZ(i, k, k * 0.5, k * 0.05);
-      } else {
-        const wrecked = car.mode === 'static' || car.mode === 'knocked';
-        const f = wrecked ? 0.1 : front;
-        M.front.instanceColor.setXYZ(i, f, f * 0.96, f * 0.86);
-        const rear = car.braking ? 2.2 : night > 0.25 ? 0.9 : 0.22;
-        M.rear.instanceColor.setXYZ(i, rear, rear * 0.08, rear * 0.05);
+      mesh.setColorAt(i, this.color);
+      const wrecked = car.mode === 'static' || car.mode === 'knocked';
+      let left = 0;
+      let right = 0;
+      if (car.hazard) left = right = blink ? 2.5 : 0;
+      else if (!wrecked && blink) {
+        const side = this.indicator(car);
+        if (side > 0) left = 2.5;
+        else if (side < 0) right = 2.5;
       }
-      if (car.kind === 'police') {
-        this.beaconL.setMatrixAt(beacons, m);
-        this.beaconR.setMatrixAt(beacons, m);
-        const on = car.beacon;
-        const l = on && (flash === 0 || flash === 2) ? 3 : 0.25;
-        const r = on && (flash === 1 || flash === 3) ? 3 : 0.25;
-        this.beaconL.instanceColor.setXYZ(beacons, 0.1 * l, 0.25 * l, l);
-        this.beaconR.instanceColor.setXYZ(beacons, r, 0.08 * r, 0.06 * r);
-        beacons++;
-      }
+      const tail = wrecked ? 0 : car.braking ? 2.4 : tailBase;
+      mesh.geometry.attributes.aLamp.setXYZW(i, wrecked ? 0 : head, tail, left, right);
+      const on = car.beacon;
+      mesh.geometry.attributes.aBeacon.setXY(i, on && (flash === 0 || flash === 2) ? 4 : 0, on && (flash === 1 || flash === 3) ? 4 : 0);
+      if (hi) this.placeWheels(car, M.spec, m);
+      this.scale.set(car.spec.wid + 0.45, 1, car.spec.len + 0.5);
+      this.vec.set(car.x, car.y + 0.03, car.z);
+      this.local.compose(this.vec, this.quat.setFromAxisAngle(this.axisY, car.yaw), this.scale);
+      this.shadows.setMatrixAt(shadowCount++, this.local);
     }
+    this.shadows.count = shadowCount;
+    this.shadows.instanceMatrix.needsUpdate = true;
     for (const k of KIND_IDS) {
       const M = this.meshes[k];
-      for (const mesh of [M.body, M.front, M.rear]) {
-        mesh.count = counts[k];
+      for (const [mesh, n] of [[M.lo, this.counts[k].lo], [M.hi, this.counts[k].hi]]) {
+        if (!mesh) continue;
+        mesh.count = n;
+        mesh.visible = n > 0;
+        if (!n) continue;
         mesh.instanceMatrix.needsUpdate = true;
         mesh.instanceColor.needsUpdate = true;
+        mesh.geometry.attributes.aLamp.needsUpdate = true;
+        mesh.geometry.attributes.aBeacon.needsUpdate = true;
       }
     }
-    for (const b of [this.beaconL, this.beaconR]) {
-      b.count = beacons;
-      b.instanceMatrix.needsUpdate = true;
-      b.instanceColor.needsUpdate = true;
+    for (const w of Object.values(this.wheels)) {
+      w.mesh.count = w.n;
+      w.mesh.visible = w.n > 0;
+      if (w.n) w.mesh.instanceMatrix.needsUpdate = true;
     }
     let tri = 0;
     for (const sc of this.scenes) {
