@@ -104,13 +104,13 @@ export class Truck {
     const p = this.physics;
     const m = this.model;
     if (!m) return;
-    this.group.position.set(p.x, p.y, p.z);
+    this.group.position.set(p.x, p.y + p.bounce, p.z);
     this.group.rotation.set(0, 0, 0);
     this.group.rotation.order = 'YXZ';
     this.group.rotation.y = p.yaw;
     // body pitch/roll plus a touch of suspension response to acceleration and cornering
-    this.group.rotation.x = -p.pitch;
-    this.group.rotation.z = p.roll;
+    this.group.rotation.x = -(p.pitch + p.bumpPitch);
+    this.group.rotation.z = p.roll + p.bumpRoll;
     m.body.rotation.x = -clampAbs(p.accel * 0.006, 0.03);
     m.body.rotation.z = clampAbs(p.latAccel * 0.006, 0.035);
     if (m.glb) {

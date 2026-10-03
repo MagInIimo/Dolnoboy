@@ -68,17 +68,27 @@ export function findRoute(world, start, goal) {
   const prev = new Map();
   const heap = new Heap();
   const uTurn = 45;
-  const seed = (node, cost) => {
-    if (best.has(node) && best.get(node) <= cost) return;
+  const relax = (node, cost, info) => {
+    if (cost >= (best.get(node) ?? Infinity)) return;
     best.set(node, cost);
-    prev.set(node, { start: true, node });
+    prev.set(node, info);
     heap.push({ node, g: cost, f: cost + h(node) });
   };
+  // Ways to leave a point on an edge: its two end nodes and the country roads attached along it.
+  const exits = (edge, s, fn) => {
+    fn(edge.a, 0);
+    fn(edge.b, edge.len);
+    for (const at of edge.attachments ?? []) fn(at.node, at.s);
+  };
   const se = start.edge;
-  seed(se.a, start.s / speedOf(se) + (start.dirBias > 0.3 ? uTurn : 0));
-  seed(se.b, (se.len - start.s) / speedOf(se) + (start.dirBias < -0.3 ? uTurn : 0));
+  exits(se, start.s, (node, s1) => {
+    const forward = s1 >= start.s;
+    const against = forward ? start.dirBias < -0.3 : start.dirBias > 0.3;
+    relax(node, Math.abs(s1 - start.s) / speedOf(se) + (against ? uTurn : 0), { start: true, leg: { edge: se, s0: start.s, s1 } });
+  });
   const ge = goal.edge;
-  const goalCost = (node) => (node === ge.a ? goal.s : ge.len - goal.s) / speedOf(ge);
+  const goalLegs = new Map();
+  exits(ge, goal.s, (node, sNode) => goalLegs.set(node, { edge: ge, s0: sNode, s1: goal.s }));
   let found = null;
   let foundCost = Infinity;
   let guard = 0;
@@ -86,41 +96,44 @@ export function findRoute(world, start, goal) {
     const cur = heap.pop();
     if (cur.g > (best.get(cur.node) ?? Infinity) + 1e-9) continue;
     if (cur.f >= foundCost) break;
-    if (cur.node === ge.a || cur.node === ge.b) {
-      const total = cur.g + goalCost(cur.node);
+    const gl = goalLegs.get(cur.node);
+    if (gl) {
+      const total = cur.g + Math.abs(gl.s1 - gl.s0) / speedOf(ge);
       if (total < foundCost) {
         foundCost = total;
         found = cur.node;
       }
     }
     const node = net.nodes[cur.node];
+    const wait = node.signal ? 6 : 0;
     for (const eid of node.edges) {
       const e = net.edges[eid];
       if (!e.alive) continue;
-      const other = e.a === cur.node ? e.b : e.a;
-      const cost = cur.g + e.len / speedOf(e) + (node.signal ? 6 : 0);
-      if (cost < (best.get(other) ?? Infinity)) {
-        best.set(other, cost);
-        prev.set(other, { edge: e, from: cur.node });
-        heap.push({ node: other, g: cost, f: cost + h(other) });
-      }
+      const fromA = e.a === cur.node;
+      const s0 = fromA ? 0 : e.len;
+      relax(fromA ? e.b : e.a, cur.g + e.len / speedOf(e) + wait, { from: cur.node, leg: { edge: e, s0, s1: fromA ? e.len : 0 } });
+      for (const at of e.attachments ?? []) relax(at.node, cur.g + Math.abs(at.s - s0) / speedOf(e) + wait, { from: cur.node, leg: { edge: e, s0, s1: at.s } });
+    }
+    // a country road's first node joins the highway in both directions
+    if (node.attach) {
+      const e = net.edges[node.attach.edge];
+      const s0 = node.attach.s;
+      relax(e.a, cur.g + s0 / speedOf(e) + 4, { from: cur.node, leg: { edge: e, s0, s1: 0 } });
+      relax(e.b, cur.g + (e.len - s0) / speedOf(e) + 4, { from: cur.node, leg: { edge: e, s0, s1: e.len } });
+      for (const at of e.attachments ?? []) if (at.node !== cur.node) relax(at.node, cur.g + Math.abs(at.s - s0) / speedOf(e) + 4, { from: cur.node, leg: { edge: e, s0, s1: at.s } });
     }
   }
   if (found === null) return null;
-  const chain = [];
+  const legs = [];
   let n = found;
-  while (true) {
+  for (let k = 0; k < 100000; k++) {
     const p = prev.get(n);
-    if (!p || p.start) break;
-    chain.push({ edge: p.edge, from: p.from, to: n });
+    legs.push(p.leg);
+    if (p.start) break;
     n = p.from;
   }
-  chain.reverse();
-  const legs = [];
-  const firstNode = n;
-  legs.push({ edge: se, s0: start.s, s1: firstNode === se.a ? 0 : se.len });
-  for (const c of chain) legs.push({ edge: c.edge, s0: c.from === c.edge.a ? 0 : c.edge.len, s1: c.from === c.edge.a ? c.edge.len : 0 });
-  legs.push({ edge: ge, s0: found === ge.a ? 0 : ge.len, s1: goal.s });
+  legs.reverse();
+  legs.push(goalLegs.get(found));
   return finalize(world, legs.filter((l) => Math.abs(l.s1 - l.s0) > 0.01 || l.edge === ge), start, goal);
 }
 
@@ -142,12 +155,22 @@ function finalize(world, legs, start, goal) {
     }
     if (li < legs.length - 1) {
       const next = legs[li + 1];
-      const nodeId = dir > 0 ? edge.b : edge.a;
-      const node = net.nodes[nodeId];
-      const inDir = net.departure(edge, nodeId, 12);
-      const outDir = net.departure(next.edge, nodeId, 12);
-      const turn = angleDiff(outDir.angle, inDir.angle + Math.PI);
-      const degree = node.edges.filter((id) => net.edges[id].alive).length;
+      const ndir = next.s1 >= next.s0 ? 1 : -1;
+      const a1 = net.pointAt(edge, s1 - dir * Math.min(6, Math.abs(s1 - s0) / 2), 0);
+      const b1 = net.pointAt(next.edge, next.s0 + ndir * Math.min(10, Math.abs(next.s1 - next.s0) / 2), 0);
+      const turn = angleDiff(b1.heading + (ndir < 0 ? Math.PI : 0), a1.heading + (dir < 0 ? Math.PI : 0));
+      // a junction: a node with three or more roads, or a country road leaving the highway mid-edge
+      const midEdge = s1 > 0.5 && s1 < edge.len - 0.5;
+      let node;
+      let degree;
+      if (midEdge) {
+        const at = (edge.attachments ?? []).find((q) => Math.abs(q.s - s1) < 1);
+        node = at ? net.nodes[at.node] : null;
+        degree = 3;
+      } else {
+        node = net.nodes[dir > 0 ? edge.b : edge.a];
+        degree = node.attach ? 3 : node.edges.filter((id) => net.edges[id].alive).length;
+      }
       if (degree >= 3 && Math.abs(turn) > 0.42) turns.push({ d: length, kind: turn > 0 ? 'left' : 'right', sharp: Math.abs(turn) > 1.9, node });
       else if (degree >= 3 && Math.abs(turn) <= 0.42) turns.push({ d: length, kind: 'straight', node });
     }

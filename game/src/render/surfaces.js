@@ -3,8 +3,8 @@ import { arrayTexture, canvas, flatNormalCanvas, imageToCanvas, loadImage, noise
 import { GLSL_HASH, GLSL_WORLD_NORMAL, patchMaterial } from './patch.js';
 import { rng } from '../core/util.js';
 
-export const L = { ASPHALT: 0, SHOULDER: 1, CONCRETE: 2, GRAVEL: 3, PAVING: 4, GRASS: 5, DRY: 6, SOIL: 7, SAND: 8, YARD: 9 };
-const ROUGH = [0.88, 0.92, 0.94, 0.97, 0.9, 0.97, 0.98, 0.98, 0.96, 0.93];
+export const L = { ASPHALT: 0, SHOULDER: 1, CONCRETE: 2, GRAVEL: 3, PAVING: 4, GRASS: 5, DRY: 6, SOIL: 7, SAND: 8, YARD: 9, WORN: 10 };
+const ROUGH = [0.88, 0.92, 0.94, 0.97, 0.9, 0.97, 0.98, 0.98, 0.96, 0.93, 0.94];
 
 const FILES = {
   asphalt: ['assets/asphalt_02/asphalt_02_diff_1k.jpg', 'assets/asphalt_02/asphalt_02_nor_gl_1k.jpg'],
@@ -55,11 +55,57 @@ export function buildSurfaceArrays(photos, size) {
     return [150 + v * 0.42, 132 + v * 0.38, 98 + v * 0.3];
   });
   const yard = imageToCanvas(photos.concrete.diff, size, 'brightness(0.86) saturate(0.4) contrast(1.1)');
-  const color = arrayTexture([asphalt, shoulder, concrete, gravel, paving, grass, dry, soil, sand, yard]);
+  const worn = wornAsphalt(photos, size);
+  const color = arrayTexture([asphalt, shoulder, concrete, gravel, paving, grass, dry, soil, sand, yard, worn]);
   const n = (img) => imageToCanvas(img, size);
   const flat = flatNormalCanvas(size);
-  const normal = arrayTexture([n(photos.asphalt.nor), n(photos.asphalt.nor), n(photos.concrete.nor), n(photos.gravel.nor), flat, n(photos.grass.nor), n(photos.dry.nor), n(photos.gravel.nor), n(photos.gravel.nor), n(photos.concrete.nor)], { srgb: false });
+  const normal = arrayTexture([n(photos.asphalt.nor), n(photos.asphalt.nor), n(photos.concrete.nor), n(photos.gravel.nor), flat, n(photos.grass.nor), n(photos.dry.nor), n(photos.gravel.nor), n(photos.gravel.nor), n(photos.concrete.nor), n(photos.asphalt.nor)], { srgb: false });
   return { color, normal };
+}
+
+// Old country asphalt: faded, grey, with a tileable network of cracks and sealed seams.
+function wornAsphalt(photos, size) {
+  const c = imageToCanvas(photos.asphalt.diff, size, 'brightness(1.05) contrast(0.85) saturate(0.35)');
+  const g = c.getContext('2d');
+  const r = rng(4411);
+  const k = size / 512;
+  // tar-sealed cracks (dark, slightly wider) and fresh hairline cracks; drawn 9 times for seamless tiling
+  for (let i = 0; i < 26; i++) {
+    let x = r() * size;
+    let y = r() * size;
+    let a = r() * Math.PI * 2;
+    const sealed = r() < 0.4;
+    const segs = 6 + Math.floor(r() * 18);
+    const pts = [[x, y]];
+    for (let j = 0; j < segs; j++) {
+      a += (r() - 0.5) * 1.3;
+      x += Math.cos(a) * (8 + r() * 14) * k;
+      y += Math.sin(a) * (8 + r() * 14) * k;
+      pts.push([x, y]);
+    }
+    g.strokeStyle = sealed ? 'rgba(22,22,24,0.42)' : 'rgba(34,34,36,0.38)';
+    g.lineWidth = (sealed ? 2.6 : 1.0) * k;
+    g.lineJoin = 'round';
+    for (let ox = -1; ox <= 1; ox++) {
+      for (let oy = -1; oy <= 1; oy++) {
+        g.beginPath();
+        pts.forEach(([px, py], j) => (j ? g.lineTo(px + ox * size, py + oy * size) : g.moveTo(px + ox * size, py + oy * size)));
+        g.stroke();
+      }
+    }
+  }
+  // ravelled spots where the binder is gone
+  for (let i = 0; i < 40; i++) {
+    const x = r() * size;
+    const y = r() * size;
+    const rad = (4 + r() * 16) * k;
+    const grad = g.createRadialGradient(x, y, 0, x, y, rad);
+    grad.addColorStop(0, `rgba(${150 + r() * 30},${148 + r() * 25},${140 + r() * 20},0.35)`);
+    grad.addColorStop(1, 'rgba(150,148,140,0)');
+    g.fillStyle = grad;
+    g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+  }
+  return c;
 }
 
 function pavingCanvas(size) {
@@ -217,19 +263,51 @@ export class SurfaceMaterials {
         varying vec2 vRoadUv;
         ${GLSL_HASH}
         ${GLSL_WORLD_NORMAL}
-        const float ROUGH[10] = float[10](${ROUGH.map((v) => v.toFixed(2)).join(',')});
+        const float ROUGH[${ROUGH.length}] = float[${ROUGH.length}](${ROUGH.map((v) => v.toFixed(2)).join(',')});
       `,
       fragmentMap: overlay
         ? `
-        float wear = texture2D(uMacro, vWorldPos.xz / 31.0).r;
-        vec3 under = texture(uSurf, vec3(vWorldPos.xz / 7.0, 0.0)).rgb;
-        vec3 paint = vTint * (0.8 + 0.4 * under.r);
-        diffuseColor.rgb *= mix(under * 0.9, paint, smoothstep(0.08, 0.38, wear + 0.18));
         float layerIdx = 0.0;
+        float holeWater = 0.0;
+        if (vLayer > 0.5) {
+          // potholes (layer 1) and asphalt patches (layer 2), drawn procedurally in decal space
+          vec2 q = vRoadUv * 2.0 - 1.0;
+          float seed = vTint.x * 53.0;
+          vec3 under = texture(uSurf, vec3(vWorldPos.xz / 7.0, vTint.y)).rgb;
+          vec3 col;
+          if (vLayer < 1.5) {
+            float r = length(q) + (vnoise(q * 3.2 + seed) - 0.5) * 0.5 + (vnoise(q * 9.0 - seed) - 0.5) * 0.12;
+            if (r > 0.86) discard;
+            float inside = smoothstep(0.74, 0.58, r);
+            vec3 stones = texture(uSurf, vec3(vWorldPos.xz / 1.3, 3.0)).rgb;
+            vec3 bottom = mix(vec3(0.075, 0.07, 0.065), stones * vec3(0.42, 0.38, 0.34), 0.45 + 0.3 * vnoise(q * 7.0 + seed));
+            // broken, slightly lighter crumbs around the edge and a shaded inner wall
+            vec3 rim = under * mix(0.82, 0.55, smoothstep(0.86, 0.72, r));
+            vec3 col0 = mix(rim, bottom, inside);
+            float wall = smoothstep(0.8, 0.6, r) * smoothstep(0.25, 0.62, r);
+            float lit = 0.62 + 0.5 * clamp(dot(normalize(q + 1e-4), vec2(0.55, 0.83)), -1.0, 1.0);
+            col = col0 * mix(1.0, lit, wall);
+            holeWater = uWet * smoothstep(0.62, 0.38, r);
+            col = mix(col, vec3(0.03, 0.035, 0.04), holeWater * 0.92);
+          } else {
+            vec2 a = abs(q);
+            float edge = max(a.x, a.y) + (vnoise(q * 5.0 + seed) - 0.5) * 0.08;
+            if (edge > 1.0) discard;
+            vec3 fresh = texture(uSurf, vec3(vWorldPos.xz / 7.0, 0.0)).rgb * (0.74 + 0.14 * vTint.z);
+            col = mix(fresh, vec3(0.035), smoothstep(0.9, 0.98, edge) * 0.7);
+          }
+          diffuseColor.rgb *= col;
+        } else {
+          float wear = texture2D(uMacro, vWorldPos.xz / 31.0).r;
+          vec3 under = texture(uSurf, vec3(vWorldPos.xz / 7.0, 0.0)).rgb;
+          vec3 paint = vTint * (0.8 + 0.4 * under.r);
+          diffuseColor.rgb *= mix(under * 0.9, paint, smoothstep(0.08, 0.38, wear + 0.18));
+        }
         `
         : `
         float layerIdx = floor(vLayer + 0.5);
-        vec3 c = texture(uSurf, vec3(vRoadUv, layerIdx)).rgb;
+        vec2 ruv = layerIdx > 9.5 ? vRoadUv * 0.71 : vRoadUv;
+        vec3 c = texture(uSurf, vec3(ruv, layerIdx)).rgb;
         float macro = texture2D(uMacro, vWorldPos.xz / 160.0).r;
         float patchy = texture2D(uMacro, vWorldPos.xz / 23.0 + 0.5).r;
         c *= 0.86 + 0.26 * macro;
@@ -242,12 +320,12 @@ export class SurfaceMaterials {
         ? ''
         : `
         {
-          vec3 ns = texture(uSurfN, vec3(vRoadUv, layerIdx)).xyz;
+          vec3 ns = texture(uSurfN, vec3(ruv, layerIdx)).xyz;
           vec3 wn = perturbWorldNormal(normalize(vWorldNormal), ns, 0.8);
           normal = normalize((viewMatrix * vec4(wn, 0.0)).xyz);
         }
         `,
-      fragmentRoughness: overlay ? 'float roughnessFactor = mix(0.7, 0.35, uWet);' : 'float roughnessFactor = mix(ROUGH[int(layerIdx)], 0.18, uWet * (layerIdx < 2.5 ? 1.0 : 0.5));',
+      fragmentRoughness: overlay ? 'float roughnessFactor = mix(mix(0.7, 0.35, uWet), 0.05, holeWater);' : 'float roughnessFactor = mix(ROUGH[int(layerIdx)], 0.18, uWet * (layerIdx < 2.5 ? 1.0 : 0.5));',
     });
   }
 }

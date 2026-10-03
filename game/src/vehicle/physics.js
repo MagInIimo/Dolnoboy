@@ -67,6 +67,15 @@ export class TruckPhysics {
     this.trailerYaw = 0;
     this.pitch = 0;
     this.roll = 0;
+    // suspension response to potholes: vertical offset and extra pitch/roll (damped springs)
+    this.bounce = 0;
+    this.bounceV = 0;
+    this.bumpPitch = 0;
+    this.bumpPitchV = 0;
+    this.bumpRoll = 0;
+    this.bumpRollV = 0;
+    this.holes = [0, 0, 0, 0];
+    this.pothole = 0;
     this.trailerPitch = 0;
     this.trailerRoll = 0;
     this.slip = 0;
@@ -167,6 +176,40 @@ export class TruckPhysics {
   }
 
   // input: {throttle, brake, steer, handbrake, reverseHeld}
+  // Wheels dropping into potholes jolt the suspension, rattle the cab and slowly wear the truck.
+  potholes(W, fx, fz, rx, rz, dt) {
+    const v = Math.abs(this.v);
+    const wheels = [
+      [this.wheelbase, -1.05],
+      [this.wheelbase, 1.05],
+      [0, -1.0],
+      [0, 1.0],
+    ];
+    let hit = 0;
+    for (let k = 0; k < 4; k++) {
+      const [along, side] = wheels[k];
+      const g = W.groundAt(this.x + fx * along + rx * side, this.z + fz * along + rz * side, this.lastGroundY);
+      const depth = g.edge && g.surface === 'road' && W.potholeAt ? W.potholeAt(g.edge, g.s, g.lateral) : 0;
+      if (depth > 0 && !this.holes[k] && v > 0.8) {
+        const jolt = depth * Math.min(1.4, v / 11);
+        this.bounceV -= jolt * 9;
+        this.bumpPitchV += (k < 2 ? 1 : -1) * jolt * 1.6;
+        this.bumpRollV += side * jolt * 2.2;
+        this.damage = Math.min(1, this.damage + jolt * 0.012 * (v / 14) ** 2);
+        hit = Math.max(hit, jolt);
+      }
+      this.holes[k] = depth > 0 ? 1 : 0;
+    }
+    if (hit) this.pothole = Math.max(this.pothole, hit);
+    const spring = (x, vel, k, c) => vel + (-x * k - vel * c) * dt;
+    this.bounceV = spring(this.bounce, this.bounceV, 160, 10);
+    this.bounce = clamp(this.bounce + this.bounceV * dt, -0.2, 0.2);
+    this.bumpPitchV = spring(this.bumpPitch, this.bumpPitchV, 120, 9);
+    this.bumpPitch = clamp(this.bumpPitch + this.bumpPitchV * dt, -0.06, 0.06);
+    this.bumpRollV = spring(this.bumpRoll, this.bumpRollV, 110, 8);
+    this.bumpRoll = clamp(this.bumpRoll + this.bumpRollV * dt, -0.06, 0.06);
+  }
+
   step(dt, input, colliders) {
     const W = this.world;
     const env = this.env ?? { grip: 1 };
@@ -230,6 +273,7 @@ export class TruckPhysics {
     const rollTarget = Math.atan2(gRt.y - gL.y, 2.2);
     this.pitch = lerp(this.pitch, pitchTarget, clamp(dt * 10, 0, 1));
     this.roll = lerp(this.roll, rollTarget, clamp(dt * 8, 0, 1));
+    this.potholes(W, fx, fz, rx, rz, dt);
     const groundY = (gR.y + gF.y) / 2;
     this.y = this.lastGroundY === null ? gR.y : lerp(this.y, gR.y, clamp(dt * 18, 0, 1));
     this.lastGroundY = groundY;

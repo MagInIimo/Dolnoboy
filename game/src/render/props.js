@@ -116,6 +116,42 @@ const PAINT = {
     }
     return b;
   },
+  // direction pointer to a hamlet (blue) or a rural enterprise (white) at a country road junction
+  pointer(d) {
+    const b = board(2.9, 0.95);
+    const { g, W, H } = b;
+    if (d.plain) whiteBoard(b);
+    else blueBoard(b);
+    const fg = d.plain ? '#111' : '#fff';
+    g.fillStyle = fg;
+    const tip = d.right ? W - 18 : 18;
+    const base = d.right ? W - 120 : 120;
+    g.beginPath();
+    g.moveTo(tip, H / 2);
+    g.lineTo(base, H * 0.16);
+    g.lineTo(base, H * 0.34);
+    g.lineTo(d.right ? base - 60 : base + 60, H * 0.34);
+    g.lineTo(d.right ? base - 60 : base + 60, H * 0.66);
+    g.lineTo(base, H * 0.66);
+    g.lineTo(base, H * 0.84);
+    g.closePath();
+    g.fill();
+    const x0 = d.right ? 26 : 200;
+    const x1 = d.right ? W - 200 : W - 26;
+    g.textBaseline = 'alphabetic';
+    g.textAlign = 'right';
+    g.font = `800 58px ${FONT}`;
+    const km = String(d.km);
+    g.fillText(km, x1, H * 0.55);
+    const kmW = g.measureText(km).width;
+    g.textAlign = 'left';
+    fitText(g, d.ru, 58, x1 - x0 - kmW - 24);
+    g.fillText(d.ru, x0, H * 0.55);
+    g.font = `600 28px ${FONT}`;
+    g.fillStyle = d.plain ? '#333' : '#dfe7f5';
+    g.fillText(d.en, x0 + 2, H * 0.86);
+    return b;
+  },
   city(d, end = false) {
     const b = board(d.small ? 3.0 : 3.6, d.small ? 1.15 : 1.35);
     const { g, W, H } = b;
@@ -614,6 +650,11 @@ export class Props {
         paint = () => PAINT.city({ ...s, small: s.kind === 'villageEnd' }, true);
         bottom = 1.6;
         break;
+      case 'pointer':
+        key = 'ptr:' + s.ru + ':' + s.km + ':' + s.right + ':' + !!s.plain;
+        paint = () => PAINT.pointer(s);
+        bottom = 1.7;
+        break;
       case 'limit':
         key = 'limit:' + s.value;
         paint = () => PAINT.limit(s);
@@ -739,9 +780,11 @@ export class Props {
         }
         // delineator posts on rural highways
         if (t.highway && !bridge && !lit) {
+          const atts = e.attachments ?? [];
           for (let s = Math.ceil(s0 / 50) * 50; s < s1; s += 50) {
             if (s < trimA + 20 || s > trimB - 20) continue;
             for (const side of [1, -1]) {
+              if (atts.some((a) => a.side === side && Math.abs(a.s - s) < 14)) continue;
               const p = net.pointAt(e, s, side * (t.pavedHalf + 0.9));
               posts.push({ matrix: placeMatrix(p.x, p.y - 0.12, p.z, heading) });
             }

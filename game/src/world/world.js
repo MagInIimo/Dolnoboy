@@ -6,9 +6,36 @@ import { WaterBodies } from './water.js';
 import { naturalHeight } from './relief.js';
 import { RoadNetwork } from './network.js';
 import { planCityLots, planCityStreets } from './city-plan.js';
+import { COMPANIES } from '../data/economy.js';
+
+// Hamlets at the ends of country roads.
+const HAMLETS = [
+  ['Сосновка', 'Sosnovka'], ['Берёзовка', 'Beryozovka'], ['Ивановка', 'Ivanovka'], ['Михайловка', 'Mikhaylovka'], ['Заречье', 'Zarechye'],
+  ['Покровское', 'Pokrovskoye'], ['Никольское', 'Nikolskoye'], ['Александровка', 'Aleksandrovka'], ['Красный Бор', 'Krasny Bor'], ['Липовка', 'Lipovka'],
+  ['Озёрки', 'Ozyorki'], ['Дубровка', 'Dubrovka'], ['Ключи', 'Klyuchi'], ['Горки', 'Gorki'], ['Луговое', 'Lugovoye'], ['Полянка', 'Polyanka'],
+  ['Каменка', 'Kamenka'], ['Ольховка', 'Olkhovka'], ['Слобода', 'Sloboda'], ['Васильевка', 'Vasilyevka'], ['Петровское', 'Petrovskoye'], ['Ручьи', 'Ruchyi'],
+];
+// Companies that sit at the end of a country road.
+const RURAL = ['agro', 'timber', 'sawmill', 'brick', 'agro', 'timber', 'build'];
+// Damage per road class: [holes per km, patches per km]
+const WEAR = { L: [42, 34], S: [4, 9], R: [0.7, 4], A: [0.6, 3] };
 
 const W = WATER_LEVEL;
 const HW_STEP = 8;
+
+function boundsOf(e) {
+  let x0 = Infinity;
+  let z0 = Infinity;
+  let x1 = -Infinity;
+  let z1 = -Infinity;
+  for (let i = 0; i < e.xs.length; i++) {
+    x0 = Math.min(x0, e.xs[i]);
+    x1 = Math.max(x1, e.xs[i]);
+    z0 = Math.min(z0, e.zs[i]);
+    z1 = Math.max(z1, e.zs[i]);
+  }
+  return [x0, z0, x1, z1];
+}
 
 export class World {
   constructor() {
@@ -44,6 +71,7 @@ export class World {
     }
     this.placeVillages();
     this.placeRoadsideLots();
+    this.placeLocalRoads();
     this.placeCameras();
     this.placeSigns();
     this.markSignals();
@@ -535,6 +563,170 @@ export class World {
     }
   }
 
+  // Country roads branching off the highways to farms, forestry, quarries and hamlets. They are not split into the
+  // highway graph: the start node remembers where it touches the highway (routing and props read `attach`).
+  placeLocalRoads() {
+    this.localRoads = [];
+    for (const hw of this.highways) {
+      const e = hw.edge;
+      const random = rng(hashString('local' + hw.index));
+      let s = 900 + random() * 1800;
+      while (s < e.len - 900) {
+        const made = this.tryLocalRoad(hw, s, random);
+        s += made ? 2400 + random() * 3600 : 450;
+      }
+    }
+    if (this.localRoads.length) this.net.index();
+  }
+
+  tryLocalRoad(hw, s, random) {
+    const net = this.net;
+    const e = hw.edge;
+    if (e.bridges.some((b) => s > b.s0 - 220 && s < b.s1 + 220)) return false;
+    if (this.villages.some((v) => v.edge === e.id && Math.abs(v.s - s) < v.half + 90)) return false;
+    if (this.lots.some((l) => l.edge === e.id && Math.abs(l.s - s) < 160)) return false;
+    if ((e.attachments ?? []).some((a) => Math.abs(a.s - s) < 700)) return false;
+    const p = net.pointAt(e, s);
+    for (const c of this.citiesNear(p.x, p.z)) if (Math.hypot(p.x - c.x, p.z - c.z) < c.Rout + 500) return false;
+    const side = random() < 0.5 ? 1 : -1;
+    const rx = -p.fz * side;
+    const rz = p.fx * side;
+    const start = { x: p.x + rx * (e.type.pavedHalf + 0.2), z: p.z + rz * (e.type.pavedHalf + 0.2) };
+    const want = 520 + random() * 1300;
+    const pts = [start];
+    let a = Math.atan2(rx, rz);
+    let curve = 0;
+    let x = start.x;
+    let z = start.z;
+    const step = 16;
+    for (let d = step; d <= want; d += step) {
+      if (d > 60) {
+        curve = clamp(curve + (random() - 0.5) * 0.004, -0.0045, 0.0045);
+        a += curve * step;
+      }
+      x += Math.sin(a) * step;
+      z += Math.cos(a) * step;
+      let ok = this.baseHeight(x, z) > W + 1.6 && !this.lotAt(x, z, 40);
+      for (const c of this.citiesNear(x, z)) if (Math.hypot(x - c.x, z - c.z) < c.Rout + 300) ok = false;
+      if (ok) {
+        net.scan(x, z, d < 80 ? 0 : 46, (edge) => {
+          if (edge !== e || d > 120) ok = false;
+        });
+        if (ok && this.nearLocal(x, z, 70)) ok = false;
+      }
+      if (ok && d > 80) ok = !this.villages.some((v) => Math.hypot(v.x - x, v.z - z) < v.half + 70);
+      if (!ok) {
+        if (d < 420) return false;
+        break;
+      }
+      pts.push({ x, z });
+    }
+    const end = pts[pts.length - 1];
+    const fx = Math.sin(a);
+    const fz = Math.cos(a);
+    const n0 = net.addNode(start.x, start.z, { attach: { edge: e.id, s, side } });
+    const n1 = net.addNode(end.x, end.z);
+    const L = net.addEdge(n0, n1, pts, 'L', { city: -1, local: true, parentHighway: hw.index, attach: { edge: e.id, s, side } });
+    n0.y = p.y;
+    this.profile(L, p.y, this.baseHeight(end.x, end.z, 0), 6, 0.07);
+    n1.y = L.ys[L.ys.length - 1];
+    (e.attachments = e.attachments ?? []).push({ s, side, node: n0.id, edge: L.id });
+    this.localRoads.push(L);
+    // destination: a rural company yard or a hamlet
+    // the yard trades through the nearer city along its highway
+    const market = s < e.len / 2 ? hw.A : hw.B;
+    const company = RURAL[Math.floor(random() * RURAL.length)];
+    if (random() < 0.62 && COMPANIES[company]) {
+      const w = 66;
+      const dd = 56;
+      const cx = end.x + fx * (dd / 2 + 3);
+      const cz = end.z + fz * (dd / 2 + 3);
+      let fits = true;
+      for (const u of [-0.5, 0, 0.5]) for (const v of [-0.5, 0, 0.5]) if (this.baseHeight(cx - fz * u * w + fx * v * dd, cz + fx * u * w + fz * v * dd) < W + 1.4) fits = false;
+      net.scan(cx, cz, Math.max(w, dd) / 2 + 4, (edge) => {
+        if (edge !== L) fits = false;
+      });
+      if (fits && this.nearLocal(cx, cz, Math.max(w, dd) / 2 + 10, L)) fits = false;
+      if (fits) {
+        const lot = { kind: 'company', company, city: market.index, rural: true, edge: L.id, s: L.len, side: 0, x: cx, z: cz, w, d: dd, heading: Math.atan2(-fx, -fz), roadHeading: a, y: L.ys[L.ys.length - 1], frontX: end.x, frontZ: end.z };
+        this.addLot(lot);
+        market.lots.push(lot);
+        L.destination = { lot: lot.id, company };
+        return true;
+      }
+    }
+    if (L.len > 380) {
+      const [ru, en] = HAMLETS[Math.floor(random() * HAMLETS.length)];
+      const half = Math.min(150, L.len * 0.22);
+      const vs = L.len - half - 30;
+      const vp = net.pointAt(L, vs);
+      this.villages.push({ id: this.villages.length, ru, en, x: vp.x, z: vp.z, edge: L.id, s: vs, half, seed: hashString(ru + L.id), hamlet: true });
+      L.destination = { village: ru, villageEn: en };
+    }
+    return true;
+  }
+
+  // Country roads are indexed only after all are placed, so new ones check the earlier ones directly.
+  nearLocal(x, z, r, except = null) {
+    for (const e of this.localRoads) {
+      if (e === except) continue;
+      const b = e.box ?? (e.box = boundsOf(e));
+      if (x < b[0] - r || x > b[2] + r || z < b[1] - r || z > b[3] + r) continue;
+      for (let i = 0; i < e.xs.length; i += 2) if (Math.hypot(e.xs[i] - x, e.zs[i] - z) < r) return true;
+    }
+    return false;
+  }
+
+  // Potholes and asphalt patches along an edge, generated on demand: [{s, lat, r, kind: 'hole' | 'patch', depth}]
+  wearOf(e) {
+    if (e.wear) return e.wear;
+    const rate = WEAR[e.type.id];
+    const list = [];
+    if (rate) {
+      const random = rng(hashString('wear' + e.id));
+      const t = e.type;
+      for (const [kind, perKm] of [['hole', rate[0]], ['patch', rate[1]]]) {
+        const mean = 1000 / perKm;
+        let s = random() * mean;
+        while (s < e.len) {
+          const bridge = e.bridges.some((b) => s > b.s0 - 5 && s < b.s1 + 5);
+          if (!bridge && s > 8 && s < e.len - 8) {
+            // holes gather in the wheel tracks; patches cover old repairs across a lane
+            const track = (random() < 0.5 ? -1 : 1) * (t.carriageHalf - t.laneWidth * (0.25 + random() * 0.5));
+            const lat = kind === 'hole' ? track : (random() - 0.5) * t.carriageHalf * 1.4;
+            const r = kind === 'hole' ? 0.35 + random() * 0.55 : 0.9 + random() * 1.6;
+            list.push({ s, lat, r, kind, depth: kind === 'hole' ? 0.06 + random() * 0.1 : 0, seed: random() });
+            // clusters: a second hole close by
+            if (kind === 'hole' && random() < 0.35) list.push({ s: s + 0.8 + random() * 2, lat: lat + (random() - 0.5) * 1.2, r: 0.25 + random() * 0.35, kind, depth: 0.05 + random() * 0.06, seed: random() });
+          }
+          s += mean * (0.3 + random() * 1.4);
+        }
+      }
+      list.sort((p, q) => p.s - q.s);
+    }
+    e.wear = list;
+    return list;
+  }
+
+  // Depth of a pothole under a road point (0 when none).
+  potholeAt(e, s, lateral) {
+    const list = this.wearOf(e);
+    if (!list.length) return 0;
+    let lo = 0;
+    let hi = list.length;
+    while (lo < hi) {
+      const m = (lo + hi) >> 1;
+      if (list[m].s < s - 1.3) lo = m + 1;
+      else hi = m;
+    }
+    for (let i = lo; i < list.length && list[i].s < s + 1.3; i++) {
+      const h = list[i];
+      if (h.kind !== 'hole') continue;
+      if (Math.hypot(h.s - s, h.lat - lateral) < h.r * 0.8) return h.depth;
+    }
+    return 0;
+  }
+
   placeCameras() {
     for (const hw of this.highways) {
       const e = hw.edge;
@@ -583,6 +775,17 @@ export class World {
         this.signs.push({ edge: e.id, s, dir: 1, kind: 'distance', lines: [[hw.B.ru, hw.B.en, toB]], ref: hw.ref });
         this.signs.push({ edge: e.id, s: s + 250, dir: -1, kind: 'distance', lines: [[hw.A.ru, hw.A.en, toA]], ref: hw.ref });
       }
+    }
+    // pointers at country road junctions
+    for (const L of this.localRoads ?? []) {
+      const dest = L.destination;
+      if (!dest) continue;
+      const at = L.attach;
+      const km = Math.max(1, Math.round((L.len * SCALE) / 1000));
+      const co = dest.company ? COMPANIES[dest.company] : null;
+      const ru = co ? co.ru : dest.village;
+      const en = co ? co.en : dest.villageEn;
+      for (const dir of [1, -1]) this.signs.push({ edge: at.edge, s: at.s - dir * 90, dir, kind: 'pointer', ru, en, km, right: at.side * dir > 0, plain: !!co });
     }
     for (const v of this.villages) {
       const e = net.edges[v.edge];

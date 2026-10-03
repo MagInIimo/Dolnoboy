@@ -7,6 +7,8 @@ export const ROAD_TYPES = {
   A: { id: 'A', lanes: 2, laneWidth: 3.4, median: 0.6, shoulder: 0.35, sidewalk: 4.5, verge: 0, speed: 60, highway: false },
   S: { id: 'S', lanes: 1, laneWidth: 3.5, median: 0, shoulder: 0.9, sidewalk: 3.2, verge: 0, speed: 60, highway: false },
   Y: { id: 'Y', lanes: 1, laneWidth: 4.0, median: 0, shoulder: 0.5, sidewalk: 0, verge: 0, speed: 20, highway: false },
+  // country road: narrow, patched, without markings
+  L: { id: 'L', lanes: 1, laneWidth: 3.0, median: 0, shoulder: 0.3, sidewalk: 0, verge: 1.8, speed: 60, highway: false, local: true },
 };
 for (const t of Object.values(ROAD_TYPES)) {
   t.carriageHalf = t.median / 2 + t.lanes * t.laneWidth;

@@ -209,7 +209,7 @@ export class Traffic {
     const r = this.random;
     const a = r() * Math.PI * 2;
     const d = minR + r() * (this.radius - 40 - minR);
-    const q = this.net.nearest(px + Math.sin(a) * d, pz + Math.cos(a) * d, 140, (e) => e.alive && e.type.id !== 'Y');
+    const q = this.net.nearest(px + Math.sin(a) * d, pz + Math.cos(a) * d, 140, (e) => e.alive && e.type.id !== 'Y' && !e.type.local);
     if (!q) return false;
     const e = q.edge;
     const dir = r() < 0.5 ? 1 : -1;

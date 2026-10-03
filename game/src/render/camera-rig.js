@@ -71,11 +71,11 @@ export class CameraRig {
         this.lookPitch = damp(this.lookPitch, 0, 3, dt);
       }
       const yaw = p.yaw + this.lookYaw;
-      const pitch = -0.08 + this.lookPitch - p.pitch;
+      const pitch = -0.08 + this.lookPitch - p.pitch - p.bumpPitch * 0.7;
       tmp2.set(cam.position.x + Math.sin(yaw) * Math.cos(pitch), cam.position.y + Math.sin(pitch), cam.position.z + Math.cos(yaw) * Math.cos(pitch));
       cam.up.set(0, 1, 0);
       cam.lookAt(tmp2);
-      cam.rotateZ(-p.roll * 0.8);
+      cam.rotateZ(-(p.roll + p.bumpRoll) * 0.8);
       if (cam.near !== 0.12) {
         cam.near = 0.12;
         cam.fov = 68;

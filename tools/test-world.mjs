@@ -86,3 +86,14 @@ for (const city of world.cities) {
   const kinds = city.lots.map((l) => l.kind === 'company' ? l.company : l.kind);
   if (lotsInWater || !kinds.includes('fuel') || !kinds.includes('service') || city.lots.filter((l) => l.kind === 'company').length < 3) console.log('lot problem', city.id, 'water', lotsInWater, kinds.join(','));
 }
+
+// country roads and road wear
+const locals = world.localRoads ?? [];
+const toLots = locals.filter((e) => e.destination?.lot !== undefined).length;
+const toHamlets = locals.filter((e) => e.destination?.village).length;
+let holes = 0;
+let patches = 0;
+for (const e of alive) for (const w of world.wearOf(e)) w.kind === 'hole' ? holes++ : patches++;
+const localGrade = Math.max(0, ...locals.map((e) => Math.max(...Array.from(e.ys).slice(1).map((y, i) => Math.abs(y - e.ys[i]) / Math.max(1e-6, e.ss[i + 1] - e.ss[i])))));
+console.log('country roads', locals.length, 'km', (sum(locals) / 1000).toFixed(1), 'to yards', toLots, 'to hamlets', toHamlets, 'worst grade', (localGrade * 100).toFixed(1) + '%');
+console.log('potholes', holes, 'patches', patches);

@@ -338,6 +338,9 @@ export class Game {
       const [a, b] = opts.hw.split('-');
       const hw = this.world.highways.find((h) => h.A.id === a && h.B.id === b);
       if (hw) pt = net.pointAt(hw.edge, Math.min(hw.edge.len - 50, opts.s ?? hw.edge.len / 2), hw.edge.type.carriageHalf - hw.edge.type.laneWidth / 2);
+    } else if (opts.local !== undefined) {
+      const e = this.world.localRoads[opts.local];
+      if (e) pt = net.pointAt(e, Math.min(e.len - 20, opts.s ?? e.len * 0.3), e.type.carriageHalf - e.type.laneWidth / 2);
     } else if (opts.city) {
       const c = this.world.cities.find((q) => q.id === opts.city);
       const ring = c?.plan.edges.filter((e) => e.alive && e.role === (opts.role ?? 'radial'));
@@ -993,6 +996,10 @@ export class Game {
         this.hud.flash();
         this.sound.chime('bad');
       }
+    }
+    if (p.pothole > 0) {
+      this.sound.thud(Math.min(1.2, p.pothole * 9));
+      p.pothole = 0;
     }
     if (p.impact > 2.5 && this.fineCooldown <= 0) {
       this.sound.thud(Math.min(2, p.impact / 4));

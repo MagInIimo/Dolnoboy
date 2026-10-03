@@ -80,6 +80,8 @@ function profileFor(type, bridge) {
     if (!bridge) P.push([-o, -p, L.GRAVEL, -0.22, -0.02]);
     P.push([-p, -c, L.SHOULDER, 0, 0], [-c, c, L.ASPHALT, 0, 0], [c, p, L.SHOULDER, 0, 0]);
     if (!bridge) P.push([p, o, L.GRAVEL, -0.02, -0.22]);
+  } else if (type.local) {
+    P.push([-o, -p, L.GRAVEL, -0.16, -0.03], [-p, p, L.WORN, 0, 0], [p, o, L.GRAVEL, -0.03, -0.16]);
   } else {
     P.push([-p, p, L.ASPHALT, 0, 0]);
   }
@@ -205,6 +207,40 @@ export class RoadBuilder {
       }
     }
     this.markings(e, rows, marks, sA, sB);
+    this.wearDecals(e, rows, marks);
+  }
+
+  // Potholes and patches: small decals on the overlay layer (the shader draws them from decal uv).
+  wearDecals(e, rows, marks) {
+    const list = this.world.wearOf(e);
+    if (!list.length) return;
+    const lo = rows[0].s;
+    const hi = rows[rows.length - 1].s;
+    const under = e.type.local ? L.WORN : L.ASPHALT;
+    const at = (s) => {
+      let k = 0;
+      while (k < rows.length - 2 && rows[k + 1].s < s) k++;
+      const A = rows[k];
+      const B = rows[k + 1];
+      const t = clamp((s - A.s) / (B.s - A.s || 1), 0, 1);
+      return { x: A.x + (B.x - A.x) * t, y: A.y + (B.y - A.y) * t, z: A.z + (B.z - A.z) * t, rx: A.rx + (B.rx - A.rx) * t, rz: A.rz + (B.rz - A.rz) * t };
+    };
+    for (const w of list) {
+      if (w.s < lo + w.r || w.s > hi - w.r) continue;
+      const along = w.kind === 'hole' ? w.r : w.r * 1.4;
+      const across = w.r;
+      const layer = w.kind === 'hole' ? 1 : 2;
+      const tint = [w.seed, under, w.seed * 0.7];
+      const ids = [];
+      for (let j = 0; j <= 2; j++) {
+        const p = at(w.s - along + along * j);
+        for (let i = 0; i <= 2; i++) {
+          const lat = w.lat - across + across * i;
+          ids.push(marks.vertex(p.x + p.rx * lat, p.y + 0.012, p.z + p.rz * lat, 0, 1, 0, i / 2, j / 2, { aLayer: layer, aTint: tint }));
+        }
+      }
+      for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) marks.quad(ids[j * 3 + i], ids[j * 3 + i + 1], ids[(j + 1) * 3 + i + 1], ids[(j + 1) * 3 + i]);
+    }
   }
 
   markings(e, rows, marks, sA, sB) {
