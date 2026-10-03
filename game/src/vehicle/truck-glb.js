@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { canvas } from '../render/textures.js';
 
 // The detailed 6x4 tractor modelled in Blender for this game (assets/models/tractor.glb).
@@ -10,7 +11,7 @@ let template = null;
 
 export async function loadTractorAsset(url = 'assets/models/tractor.glb') {
   try {
-    const gltf = await new GLTFLoader().loadAsync(url);
+    const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url);
     template = gltf.scene;
   } catch (e) {
     console.warn('tractor model unavailable, using the procedural cab', e);
@@ -47,6 +48,9 @@ function splitMesh(mesh, keyOf) {
     geo.boundingBox = box;
     geo.boundingSphere = box.getBoundingSphere(new THREE.Sphere());
     const m = new THREE.Mesh(geo, mesh.material.clone());
+    // the same bounds in the parent's frame (quantized meshes carry a scale and offset)
+    mesh.updateMatrix();
+    m.userData.box = box.clone().applyMatrix4(mesh.matrix);
     m.position.copy(mesh.position);
     m.quaternion.copy(mesh.quaternion);
     m.scale.copy(mesh.scale);
@@ -88,6 +92,15 @@ export function buildTractorGlb({ color = 0xe9ebe8, lightBar = false } = {}) {
   };
   // paint
   for (const m of byMaterial('MAT-paint')) m.material.color.setHex(color);
+  // the cab interior sits in the shade of the roof: less sky light and reflections
+  for (const name of ['MAT-interior', 'MAT-cockpit_polymer', 'MAT-steering_leather']) {
+    for (const m of byMaterial(name)) {
+      const c = m.material.color;
+      const grey = (c.r + c.g + c.b) / 3;
+      c.setRGB(grey * 1.15, grey * 1.1, grey * 1.05);
+      m.material.envMapIntensity = 0.6;
+    }
+  }
   // lamps split into the parts that light up separately
   const lamps = { head: [], reverse: [], tail: [], left: [], right: [], marker: [] };
   for (const m of byMaterial('MAT-lamp_front')) {
@@ -116,7 +129,7 @@ export function buildTractorGlb({ color = 0xe9ebe8, lightBar = false } = {}) {
   for (const m of byMaterial('MAT-mirror')) {
     const p = splitMesh(m, (c) => (c.x > 0 ? 'L' : 'R'));
     for (const [side, mesh] of Object.entries(p)) {
-      const bb = mesh.geometry.boundingBox;
+      const bb = mesh.userData.box;
       const pane = new THREE.Mesh(new THREE.PlaneGeometry(Math.max(0.2, bb.max.x - bb.min.x) * 0.8, (bb.max.y - bb.min.y) * 0.86), mesh.material);
       pane.position.set((bb.min.x + bb.max.x) / 2, (bb.min.y + bb.max.y) / 2, bb.min.z - 0.025);
       pane.rotation.y = Math.PI;

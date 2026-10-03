@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 
 // Traffic vehicles modelled in Blender (tools/blender/cars.py → assets/models/cars.glb).
 // Every kind is merged into one geometry with per-vertex colour and material parameters so a whole
@@ -37,7 +38,7 @@ let models = null;
 
 export async function loadCarModels(url = 'assets/models/cars.glb') {
   try {
-    const gltf = await new GLTFLoader().loadAsync(url);
+    const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url);
     gltf.scene.updateMatrixWorld(true);
     const out = { kinds: {}, wheels: {} };
     for (const node of gltf.scene.children) {

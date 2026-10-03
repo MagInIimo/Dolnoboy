@@ -1,4 +1,5 @@
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { mergeNode, vehicleMaterial } from '../traffic/car-models.js';
 
 // Hero landmarks modelled in Blender (tools/blender/landmarks.py → assets/models/landmarks.glb).
@@ -20,6 +21,15 @@ const ROLES = {
   paving: [[0.45, 0.44, 0.41], 0.85, 0],
   concrete: [[0.58, 0.58, 0.56], 0.85, 0],
   steel: [[0.52, 0.54, 0.57], 0.4, 0.8],
+  redBrick: [[0.46, 0.13, 0.09], 0.85, 0],
+  glassBlue: [[0.14, 0.26, 0.4], 0.08, 0.7],
+  glassGold: [[0.5, 0.36, 0.16], 0.12, 0.85],
+  glassDark: [[0.05, 0.07, 0.09], 0.08, 0.6],
+  glassGreen: [[0.12, 0.28, 0.27], 0.08, 0.7],
+  red: [[0.62, 0.08, 0.06], 0.6, 0.1],
+  white: [[0.86, 0.86, 0.84], 0.6, 0],
+  yellow: [[0.8, 0.64, 0.32], 0.8, 0],
+  green: [[0.1, 0.38, 0.2], 0.4, 0.3],
 };
 
 let models = {};
@@ -27,7 +37,7 @@ let material = null;
 
 export async function loadLandmarkModels(url = 'assets/models/landmarks.glb') {
   try {
-    const gltf = await new GLTFLoader().loadAsync(url);
+    const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url);
     gltf.scene.updateMatrixWorld(true);
     for (const node of gltf.scene.children) {
       const raw = node.userData?.landmark;

@@ -606,7 +606,7 @@ const KIND = {
   ostankino: 'ring', moscowCity: 'ring', stalinTower: 'ring', lakhta: 'ring', ekbCity: 'ring', tvTower: 'ring', steelPlant: 'out', truckPlant: 'out', carPlant: 'out',
   waterTower: 'ring', brickWaterTower: 'plaza', familyCenter: 'water',
 };
-const RADIUS = { kremlin: 82, kremlinSmall: 52, stoneFortress: 56, fortressWall: 100, kazanKremlin: 118, whiteKremlin: 64, familyCenter: 38, ostankino: 22, moscowCity: 70, stalinTower: 42, admiralty: 64, lakhta: 40, travelPalace: 40, rotunda: 12, aeolianHarp: 9, fireTower: 22, waterTower: 10, brickWaterTower: 10, tvTower: 16, rocketVostok: 34, rocketSoyuz: 20, shipGoto: 26, shipHouse: 40, grainExchange: 28, woodenQuarter: 46, flemishEmbankment: 58, cableCar: 40, happinessLetters: 34, ekbCity: 66, horseman: 12, borderBridge: 10, carPlant: 82, truckPlant: 92, steelPlant: 90, arenaOrange: 70, arenaVolga: 72, arenaRostov: 70, stadiumBowl: 68, planetarium: 22, conservatory: 30, seaTerminal: 40, portCranes: 56 };
+const RADIUS = { kremlin: 140, kremlinSmall: 52, stoneFortress: 56, fortressWall: 100, kazanKremlin: 118, whiteKremlin: 64, familyCenter: 38, ostankino: 34, moscowCity: 90, stalinTower: 76, admiralty: 112, lakhta: 82, travelPalace: 40, rotunda: 12, aeolianHarp: 9, fireTower: 22, waterTower: 10, brickWaterTower: 10, tvTower: 16, rocketVostok: 34, rocketSoyuz: 30, shipGoto: 26, shipHouse: 40, grainExchange: 28, woodenQuarter: 46, flemishEmbankment: 58, cableCar: 40, happinessLetters: 34, ekbCity: 66, horseman: 12, borderBridge: 10, carPlant: 82, truckPlant: 92, steelPlant: 90, arenaOrange: 70, arenaVolga: 72, arenaRostov: 70, stadiumBowl: 68, planetarium: 22, conservatory: 30, seaTerminal: 40, portCranes: 56 };
 
 export function landmarkSites(world, city) {
   if (city.landmarkSites) return city.landmarkSites;
@@ -626,7 +626,9 @@ export function landmarkSites(world, city) {
     if (!kind || kind === 'plaza') continue;
     const rad = RADIUS[id] ?? 30;
     let best = null;
-    for (let k = 0; k < 64; k++) {
+    for (let k = 0; k < 220 && !(best && k >= 64); k++) {
+      // big monuments get a looser clearance test once the first attempts fail
+      const slack = k < 64 ? 0.8 : k < 140 ? 0.6 : 0.45;
       const a = r() * Math.PI * 2;
       let d;
       if (kind === 'ring') d = city.R * (0.45 + r() * 0.35);
@@ -639,11 +641,11 @@ export function landmarkSites(world, city) {
       let clear = true;
       for (let s = 0; s < 8 && clear; s++) {
         const b = (s / 8) * Math.PI * 2;
-        const px = x + Math.sin(b) * rad * 0.8;
-        const pz = z + Math.cos(b) * rad * 0.8;
+        const px = x + Math.sin(b) * rad * slack;
+        const pz = z + Math.cos(b) * rad * slack;
         if (world.net.query(px, pz, 2).length || world.lotAt(px, pz, 4)) clear = false;
       }
-      if (world.net.query(x, z, rad * 0.4).length) clear = false;
+      if (world.net.query(x, z, rad * slack * 0.5).length) clear = false;
       if (!clear) continue;
       let score = 0;
       if (kind === 'water') {

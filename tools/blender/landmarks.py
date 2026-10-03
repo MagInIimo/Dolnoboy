@@ -35,6 +35,15 @@ MDEF = {
     'paving': ((0.5, 0.49, 0.46), 0.85, 0.0),
     'concrete': ((0.62, 0.62, 0.6), 0.85, 0.0),
     'steel': ((0.55, 0.57, 0.6), 0.4, 0.8),
+    'redBrick': ((0.5, 0.15, 0.1), 0.85, 0.0),
+    'glassBlue': ((0.16, 0.3, 0.45), 0.08, 0.7),
+    'glassGold': ((0.55, 0.4, 0.18), 0.12, 0.85),
+    'glassDark': ((0.06, 0.08, 0.1), 0.08, 0.6),
+    'glassGreen': ((0.14, 0.32, 0.3), 0.08, 0.7),
+    'red': ((0.68, 0.09, 0.07), 0.6, 0.1),
+    'white': ((0.9, 0.9, 0.88), 0.6, 0.0),
+    'yellow': ((0.86, 0.7, 0.36), 0.8, 0.0),
+    'green': ((0.12, 0.42, 0.22), 0.4, 0.3),
 }
 MLIST = list(MDEF)
 MATS = {}
@@ -412,7 +421,323 @@ def fix(o):
     pass
 
 
-BUILDERS = {'kazanKremlin': kazan_kremlin, 'familyCenter': family_center}
+
+# ---------- Moscow-style kremlin (also Nizhny Novgorod) ----------
+def swallow_wall(l, p0, p1, h, t, m):
+    (x0, z0), (x1, z1) = p0, p1
+    length = math.hypot(x1 - x0, z1 - z0)
+    rot = math.atan2(x1 - x0, z1 - z0) - math.pi / 2
+    l.box((x0 + x1) / 2, 0, (z0 + z1) / 2, length, h, t, m, rot)
+    n = int(length / 2.6)
+    for i in range(n):
+        k = (i + 0.5) / n
+        px, pz = x0 + (x1 - x0) * k, z0 + (z1 - z0) * k
+        # swallowtail merlon: a block with a notch (two horns)
+        l.box(px, h, pz, 1.5, 1.6, t * 0.4, m, rot)
+        ax, az = (x1 - x0) / length, (z1 - z0) / length
+        for sgn in (-1, 1):
+            l.box(px + ax * sgn * 0.5, h + 1.6, pz + az * sgn * 0.5, 0.45, 0.9, t * 0.4, m, rot)
+
+
+def tent_tower(l, x, z, w, h, tiers=True, main=False):
+    """Square brick tower with white trim, an octagonal tier and a tall green tent (no star on top)."""
+    l.box(x, 0, z, w, h, w, 'redBrick')
+    l.box(x, h, z, w + 0.8, 0.8, w + 0.8, 'white')
+    y = h + 0.8
+    if tiers:
+        l.box(x, y, z, w * 0.72, w * 0.55, w * 0.72, 'redBrick')
+        for k in range(4):
+            a = k * math.pi / 2
+            l.box(x + math.sin(a) * w * 0.365, y + w * 0.12, z + math.cos(a) * w * 0.365, w * 0.2, w * 0.3, 0.12, 'window', a)
+        y += w * 0.55
+        if main:
+            # clock faces
+            for k in range(4):
+                a = k * math.pi / 2
+                l.lathe(x + math.sin(a) * (w * 0.37), z + math.cos(a) * (w * 0.37), y - w * 0.3, [(0, 0), (w * 0.2, 0.0)], 16, 'white', False)
+        l.prism(x, z, y, w * 0.3, w * 0.5, 8, 'redBrick', math.pi / 8)
+        l.prism(x, z, y + w * 0.5, w * 0.33, 0.5, 8, 'white', math.pi / 8)
+        y += w * 0.5 + 0.5
+        l.tent(x, z, y, w * 0.3, w * (1.6 if main else 1.2), 8, 'green', math.pi / 8)
+        y += w * (1.6 if main else 1.2)
+    else:
+        l.tent(x, z, y, w * 0.62, w * 1.1, 4, 'green', math.pi / 4)
+        y += w * 1.1
+    l.ball(x, z, y - 0.2, 0.6, 'gold', 8)
+
+
+def gold_domed_hall(l, x, z, w, d, h, domes, dome_mat='gold'):
+    l.box(x, 0, z, w, h, d, 'white')
+    l.box(x, h, z, w + 0.6, 0.6, d + 0.6, 'trim')
+    for side in (-1, 1):
+        l.windows_z(z - d / 2 + 2, z + d / 2 - 2, x + side * w / 2, h * 0.3, h * 0.8, max(2, int(d / 5)), 1.2, h * 0.35, sign=side, arch=True)
+        l.windows_x(x - w / 2 + 2, x + w / 2 - 2, z + side * d / 2, h * 0.3, h * 0.8, max(2, int(w / 5)), 1.2, h * 0.35, sign=side, arch=True)
+    for dx, dz, r, dh in domes:
+        l.lathe(x + dx, z + dz, h + 0.6, [(r, 0), (r, dh)], 16, 'white', False)
+        l.onion(x + dx, z + dz, h + 0.6 + dh, r * 1.15, r * 2.6, dome_mat)
+        l.ball(x + dx, z + dz, h + 0.6 + dh + r * 2.6, 0.35, 'gold', 8)
+
+
+def bell_tower(l, x, z):
+    """Tall white tiered octagonal bell tower with a gold dome."""
+    y = 0
+    for r, h in ((7, 20), (6, 14), (5, 12)):
+        l.prism(x, z, y, r, h, 8, 'white', math.pi / 8)
+        l.prism(x, z, y + h, r + 0.5, 0.8, 8, 'trim', math.pi / 8)
+        for k in range(8):
+            a = math.pi / 8 + k * math.pi / 4
+            l.box(x + math.sin(a) * r * 0.93, y + h * 0.35, z + math.cos(a) * r * 0.93, r * 0.35, h * 0.45, 0.12, 'window', a)
+        y += h + 0.8
+    l.lathe(x, z, y, [(4, 0), (4, 6)], 16, 'white', False)
+    l.onion(x, z, y + 6, 4.6, 11, 'gold')
+    l.ball(x, z, y + 17, 0.5, 'gold', 8)
+
+
+def colourful_domes(l, x, z):
+    """A cluster of tower-churches with bright patterned onion domes, without crosses."""
+    l.box(x, 0, z, 30, 6, 30, 'redBrick')
+    l.box(x, 6, z, 31, 0.7, 31, 'white')
+    cols = ['red', 'green', 'domeBlue', 'yellow', 'green', 'red', 'domeTeal', 'yellow']
+    for k in range(8):
+        a = k * math.pi / 4
+        px, pz = x + math.sin(a) * 10, z + math.cos(a) * 10
+        big = k % 2 == 0
+        r = 3.4 if big else 2.4
+        h = 14 if big else 10
+        l.prism(px, pz, 6.7, r, h, 8, 'redBrick', math.pi / 8)
+        l.prism(px, pz, 6.7 + h, r + 0.3, 0.6, 8, 'white', math.pi / 8)
+        l.lathe(px, pz, 7.3 + h, [(r * 0.75, 0), (r * 0.75, 3)], 12, 'white', False)
+        l.onion(px, pz, 10.3 + h, r * 1.05, r * 2.6, cols[k])
+        l.ball(px, pz, 10.3 + h + r * 2.6, 0.3, 'gold', 8)
+    # central tent
+    l.prism(x, z, 6.7, 5, 18, 8, 'redBrick', math.pi / 8)
+    l.tent(x, z, 24.7, 5.4, 16, 8, 'yellow', math.pi / 8)
+    l.ball(x, z, 40.5, 0.6, 'gold', 8)
+
+
+def kremlin():
+    b = Buf()
+    l = L(b)
+    outline = [(-96, 70), (92, 84), (100, -40), (6, -110), (-104, -40)]
+    for i in range(len(outline)):
+        swallow_wall(l, outline[i], outline[(i + 1) % len(outline)], 12, 4.5, 'redBrick')
+    for i, (x, z) in enumerate(outline):
+        tent_tower(l, x, z, 13, 22)
+    # mid-wall towers, the main gate tower with clock faces on the square side
+    for i in range(len(outline)):
+        (x0, z0), (x1, z1) = outline[i], outline[(i + 1) % len(outline)]
+        mx, mz = (x0 + x1) / 2, (z0 + z1) / 2
+        tent_tower(l, mx, mz, 11 if i else 14, 20 if i else 26, True, i == 0)
+    # grounds
+    l.box(0, 0.02, -8, 150, 0.1, 120, 'paving')
+    gold_domed_hall(l, -10, 0, 26, 32, 18, [(0, 0, 4.0, 6), (-7, -8, 2.6, 4), (7, -8, 2.6, 4), (-7, 8, 2.6, 4), (7, 8, 2.6, 4)])
+    gold_domed_hall(l, 26, 10, 18, 22, 14, [(0, 0, 3.4, 5), (0, -6, 2.2, 3)])
+    bell_tower(l, -36, -6)
+    # long palace
+    pal = l.at(10, -55, 0.15)
+    pal.box(0, 0, 0, 96, 22, 22, 'yellow')
+    pal.box(0, 22, 0, 97, 0.8, 23, 'white')
+    pal.box(0, 22.8, 0, 96, 3.5, 22, 'green')
+    for side in (-1, 1):
+        pal.windows_x(-45, 45, side * 11, 3, 8, 24, 1.4, 3.6, sign=side, arch=True)
+        pal.windows_x(-45, 45, side * 11, 12, 18, 24, 1.4, 4.4, sign=side, arch=True)
+    pal.box(0, 26.3, 0, 12, 5, 12, 'yellow')
+    pal.dome(0, 0, 31.3, 6, 5, 'green', 16, 0.5)
+    # square outside the main gate with the colourful-domed church
+    l.box(-10, 0.02, 112, 150, 0.1, 50, 'paving')
+    colourful_domes(l, 40, 118)
+    o = b.obj('kremlin')
+    o['landmark'] = json.dumps({'radius': 135, 'lift': 0})
+    return o
+
+
+# ---------- Moscow towers ----------
+def ostankino():
+    b = Buf()
+    l = L(b)
+    # ten tapered legs forming arches at the base
+    for k in range(10):
+        a = 2 * math.pi * k / 10
+        x, z = math.sin(a) * 30, math.cos(a) * 30
+        strut(b, (x, 0, z), (math.sin(a) * 9, 62, math.cos(a) * 9), 2.6, 'concrete')
+    l.lathe(0, 0, 0, [(13, 18), (10.5, 62), (9, 120), (7.2, 200), (6.0, 280), (5.4, 318)], 20, 'concrete', False)
+    # rings along the shaft
+    for y in (90, 150, 230):
+        l.lathe(0, 0, y, [(8.8, 0), (9.4, 0.6), (9.4, 1.6), (8.8, 2.2)], 20, 'white', False)
+    # restaurant pod ('seventh heaven') with dark glazing
+    l.lathe(0, 0, 318, [(5.4, 0), (9.5, 4), (10, 8), (10, 18), (9.5, 22), (5.6, 26)], 24, 'glassDark', False)
+    for y in (322, 332):
+        l.lathe(0, 0, y, [(10.1, 0), (10.6, 0.4), (10.6, 1.2), (10.1, 1.6)], 24, 'white', False)
+    l.lathe(0, 0, 344, [(5.2, 0), (4.4, 40), (3.0, 60)], 16, 'concrete', False)
+    # metal antenna with red and white bands
+    y = 404
+    for i in range(10):
+        l.lathe(0, 0, y, [(2.4 - i * 0.18, 0), (2.25 - i * 0.18, 13)], 10, 'red' if i % 2 == 0 else 'white', True)
+        y += 13
+    o = b.obj('ostankino')
+    o['landmark'] = json.dumps({'radius': 34, 'lift': 0, 'h': 540})
+    return o
+
+
+def tower_block(l, x, z, w, d, h, m, top=None, rot=0, floors=True):
+    l.box(x, 0, z, w, h, d, m, rot)
+    if floors:
+        for y in range(4, int(h), 4):
+            l.box(x, y, z, w + 0.15, 0.25, d + 0.15, 'steel' if m != 'glassGold' else 'glassDark', rot)
+    if top:
+        l.box(x, h, z, w * 0.9, 3, d * 0.9, top, rot)
+
+
+def twisted(l, x, z, r, h, sides, twist, m, taper=1.0, step=4.0):
+    """Stack of rotated prisms: a twisting glass tower."""
+    n = int(h / step)
+    for i in range(n):
+        k = i / n
+        rr = r * (1 - (1 - taper) * k)
+        l.prism(x, z, i * step, rr, step, sides, m, twist * k)
+        l.prism(x, z, (i + 1) * step - 0.25, rr + 0.12, 0.25, sides, 'steel', twist * k)
+
+
+def moscow_city():
+    b = Buf()
+    l = L(b)
+    l.box(0, 0, 0, 170, 1.2, 120, 'paving')
+    # Federation-like: two triangular-plan glass towers and a needle between
+    for (x, z, h) in ((-55, -20, 340), (-30, -38, 240)):
+        l.prism(x, z, 0, 22, h, 3, 'glassBlue', 0.3)
+        for y in range(6, h, 6):
+            l.prism(x, z, y, 22.3, 0.3, 3, 'steel', 0.3)
+    l.lathe(-44, -28, 340, [(2.0, 0), (0.3, 30)], 8, 'steel', False)
+    # Mercury-like: bronze stepped tower
+    for k, (w, h) in enumerate(((36, 120), (28, 220), (20, 300))):
+        tower_block(l, 10, -30, w, w * 0.8, h, 'glassGold', None, 0.1)
+    # Evolution-like: twisting tower
+    twisted(l, 55, 20, 17, 250, 4, 2.4, 'glassBlue', 0.85)
+    # OKO-like: dark glass tower with a crown
+    tower_block(l, -10, 30, 34, 34, 330, 'glassDark', 'steel')
+    tower_block(l, 25, 45, 26, 26, 250, 'glassDark', 'steel')
+    # City of Capitals-like stacked blocks
+    for i in range(6):
+        tower_block(l, 70 - i * 1.5, -40 + i * 2, 24, 24, 60 + i * 40, 'glassBlue' if i % 2 else 'glassGreen', None, 0.12 * i, False)
+    # podium
+    tower_block(l, -5, 0, 130, 40, 14, 'glassDark', None, 0, False)
+    o = b.obj('moscowCity')
+    o['landmark'] = json.dumps({'radius': 85, 'lift': 0, 'h': 360})
+    return o
+
+
+def stalin_tower():
+    """Stepped high-rise with wings and a tall spire (topped with a plain ball)."""
+    b = Buf()
+    l = L(b)
+    # wings
+    for side in (-1, 1):
+        l.box(side * 45, 0, 0, 50, 36, 26, 'stoneDark')
+        l.box(side * 45, 36, 0, 46, 8, 22, 'stoneDark')
+        l.tent(side * 66, 0, 44, 6, 10, 4, 'gold', math.pi / 4)
+        for y in (6, 14, 22, 30):
+            l.windows_x(side * 45 - 22, side * 45 + 22, -13, y, y + 3, 11, 1.4, 2.6, sign=-1)
+            l.windows_x(side * 45 - 22, side * 45 + 22, 13, y, y + 3, 11, 1.4, 2.6, sign=1)
+    # central stepped tower
+    y = 0
+    for w, h in ((44, 70), (34, 40), (26, 34), (18, 26)):
+        l.box(0, y, 0, w, h, w * 0.85, 'stone')
+        l.box(0, y + h, 0, w + 1, 1.2, w * 0.85 + 1, 'trim')
+        for yy in range(int(y) + 4, int(y + h) - 2, 6):
+            l.windows_x(-w / 2 + 2, w / 2 - 2, -w * 0.425, yy, yy + 3, max(2, int(w / 4)), 1.4, 3.0, sign=-1)
+            l.windows_x(-w / 2 + 2, w / 2 - 2, w * 0.425, yy, yy + 3, max(2, int(w / 4)), 1.4, 3.0, sign=1)
+        y += h + 1.2
+    for k in range(4):
+        a = math.pi / 4 + k * math.pi / 2
+        l.prism(math.sin(a) * 9, math.cos(a) * 9, y, 1.8, 10, 8, 'stone', math.pi / 8)
+    l.prism(0, 0, y, 7, 18, 8, 'stone', math.pi / 8)
+    l.tent(0, 0, y + 18, 7.2, 28, 8, 'gold', math.pi / 8)
+    l.lathe(0, 0, y + 46, [(0.8, 0), (0.3, 24)], 8, 'gold', False)
+    l.ball(0, 0, y + 70, 1.2, 'gold', 10)
+    o = b.obj('stalinTower')
+    o['landmark'] = json.dumps({'radius': 75, 'lift': 0, 'h': 250})
+    return o
+
+
+# ---------- Saint Petersburg ----------
+def admiralty():
+    b = Buf()
+    l = L(b)
+    # long yellow-and-white facade with a central gate tower and the gilded spire
+    for side in (-1, 1):
+        l.box(side * 55, 0, 0, 100, 20, 24, 'yellow')
+        l.box(side * 55, 20, 0, 101, 1.0, 25, 'white')
+        l.box(side * 55, 21, 0, 100, 3, 24, 'steel')
+        for y in (3, 11):
+            l.windows_x(side * 55 - 47, side * 55 + 47, -12, y, y + 5, 24, 1.6, 4.4, sign=-1, arch=y == 3)
+        for k in range(12):
+            l.box(side * (10 + k * 8), 2, -12.4, 1.2, 17, 0.6, 'white')  # pilasters
+    l.box(0, 0, -2, 22, 26, 30, 'yellow')
+    l.box(0, 6, -17.2, 10, 14, 1.0, 'window')  # archway
+    l.box(0, 26, -2, 23, 1.2, 31, 'white')
+    l.box(0, 27.2, -2, 16, 12, 16, 'yellow')
+    for k in range(4):
+        a = k * math.pi / 2
+        for j in range(-2, 3):
+            px = math.sin(a) * 8.4 + math.cos(a) * j * 2.6
+            pz = -2 + math.cos(a) * 8.4 - math.sin(a) * j * 2.6
+            l.lathe(px, pz, 27.2, [(0.5, 0), (0.5, 9)], 8, 'white', False)
+    l.box(0, 39.2, -2, 17, 1.2, 17, 'white')
+    l.box(0, 40.4, -2, 10, 6, 10, 'gold')
+    l.tent(0, -2, 46.4, 5.6, 30, 8, 'gold', math.pi / 8)
+    l.lathe(0, -2, 76, [(0.35, 0), (0.15, 8)], 6, 'gold', False)
+    l.box(0, 83, -2, 2.4, 1.4, 0.2, 'gold')  # ship weathervane
+    o = b.obj('admiralty')
+    o['landmark'] = json.dumps({'radius': 110, 'lift': 0, 'h': 90})
+    return o
+
+
+def lakhta():
+    b = Buf()
+    l = L(b)
+    l.box(0, 0, 0, 90, 1.2, 90, 'paving')
+    twisted(l, 0, 0, 30, 400, 5, 1.6, 'glassBlue', 0.25, 5.0)
+    l.lathe(0, 0, 400, [(7.6, 0), (4, 20), (0.6, 62)], 10, 'glassBlue', False)
+    # low arc-shaped office building at the foot
+    for k in range(9):
+        a = -1.1 + k * 0.28
+        l.box(math.sin(a) * 60, 0, math.cos(a) * 60, 18, 26 - abs(k - 4) * 3, 22, 'glassGreen', a)
+    o = b.obj('lakhta')
+    o['landmark'] = json.dumps({'radius': 80, 'lift': 0, 'h': 462})
+    return o
+
+
+# ---------- Samara ----------
+def rocket_soyuz():
+    b = Buf()
+    l = L(b)
+    # museum building (a low glass and stone box)
+    l.box(0, 0, 0, 44, 18, 44, 'stone')
+    l.box(0, 2, 0, 44.3, 10, 44.3, 'glassDark')
+    l.box(0, 18, 0, 45, 0.8, 45, 'trim')
+    base = 18.8
+    # launch frame
+    for k in range(4):
+        a = math.pi / 4 + k * math.pi / 2
+        strut(b, (math.sin(a) * 12, base, math.cos(a) * 12), (math.sin(a) * 5, base + 14, math.cos(a) * 5), 0.5, 'steel')
+    # core stage with the upper stage and the fairing
+    l.lathe(0, 0, base + 2, [(1.5, 0), (1.5, 2), (1.35, 8), (1.5, 26), (1.5, 30)], 16, 'white', False)
+    l.lathe(0, 0, base + 32, [(1.35, 0), (1.35, 6.5)], 16, 'white', False)
+    l.lathe(0, 0, base + 38.5, [(1.4, 0), (1.5, 1.0), (1.5, 6), (1.2, 8.5), (0.6, 10.5), (0.2, 12)], 16, 'white', False)
+    l.lathe(0, 0, base + 50.5, [(0.12, 0), (0.05, 3.5)], 6, 'steel', False)
+    for y in (base + 30, base + 38.5):
+        l.lathe(0, 0, y, [(1.4, 0), (1.25, 2)], 16, 'steel', False)
+    # four boosters with conical noses, the classic flared base
+    for k in range(4):
+        a = k * math.pi / 2
+        px, pz = math.sin(a) * 2.7, math.cos(a) * 2.7
+        l.lathe(px, pz, base + 2, [(1.3, 0), (1.35, 2), (1.35, 14), (1.0, 18), (0.4, 21), (0.05, 22)], 12, 'white', False)
+        l.lathe(px, pz, base + 2, [(1.36, 1.5), (1.38, 2.5)], 12, 'red', False)
+    o = b.obj('rocketSoyuz')
+    o['landmark'] = json.dumps({'radius': 30, 'lift': 0, 'h': 75})
+    return o
+
+BUILDERS = {'kazanKremlin': kazan_kremlin, 'familyCenter': family_center, 'kremlin': kremlin, 'ostankino': ostankino, 'moscowCity': moscow_city, 'stalinTower': stalin_tower, 'admiralty': admiralty, 'lakhta': lakhta, 'rocketSoyuz': rocket_soyuz}
 built = []
 for name, fn in BUILDERS.items():
     if ONLY and name not in ONLY:
