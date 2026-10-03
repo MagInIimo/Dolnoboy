@@ -1,0 +1,16 @@
+/tmp/
+/.dream-loop/
+node_modules/
+__pycache__/
+*.py[cod]
+/.env
+/.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+.DS_Store
+Thumbs.db
+/store/*.zip
+/tools/export_image_prompts.py

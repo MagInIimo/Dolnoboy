@@ -1,0 +1,1 @@
+{"private":true,"type":"module","scripts":{"build":"node build.mjs"},"dependencies":{"three":"0.160.1","@dimforge/rapier3d-compat":"0.14.0","esbuild":"0.25.10","playwright":"1.55.1"}}

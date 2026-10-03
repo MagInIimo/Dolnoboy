@@ -1,0 +1,31 @@
+from pathlib import Path
+
+root = Path(__file__).resolve().parents[1]
+
+def change(file, old, new):
+    path = root / file
+    text = path.read_text(encoding='utf-8')
+    assert text.count(old) == 1, (file, old[:80], text.count(old))
+    path.write_text(text.replace(old, new), encoding='utf-8')
+
+change('game/style.css', '@media(max-height:500px){', '@media(max-height:500px) and (orientation:landscape){')
+change('game/style.css', '@media(prefers-reduced-motion:reduce)', '@media(max-height:500px) and (orientation:portrait){.hero{margin-top:0}.hero h1{font-size:35px;margin:13px 0}.hero .description{margin-bottom:12px}.hero-actions{gap:7px}.hero-actions button{padding:9px 12px;min-height:40px}.hero-links{margin-top:9px}.hero-footer{margin-top:10px}.touch #instrument{bottom:92px;width:116px}#speed{font-size:40px}#resources{margin-top:7px;gap:4px}#balance{margin-top:6px}.touch #minimap{bottom:96px;height:98px;width:130px}.touch #map-canvas{height:76px}.touch #context-action{bottom:216px;min-height:40px}.touch #hint{display:none}#mirror-label,.touch #mirror-label{top:129px}}\n@media(prefers-reduced-motion:reduce)')
+change('game/src/ui.js', 'Геометрия, текстуры и звуки созданы для этой игры. Three.js — MIT; Rapier — Apache-2.0.', 'Модели транспорта, листва, интерфейс и звуки созданы для этой игры. Материалы поверхностей и небо — Poly Haven, CC0. Three.js — MIT; Rapier — Apache-2.0.')
+change('game/src/model.js', 'minutes:Math.ceil(r.length/1000)', "minutes:Math.max(1,Math.ceil(r.length/(cargo.id==='express'?13:8)/60))")
+change('game/src/view.js', 'this.width<600&&this.height>500?129:12', 'this.width<600&&this.height>this.width?129:12')
+
+change('game/src/scenery.js', 'let trees=null,surface=null;', '''let trees=null,surface=null;
+const glassColors=new Set([0x356d7b,0x47848a,0x516f7e]);
+const groundColors=new Set([0x8a8e62,0x7e8a57,0xb3a76e]);
+const poleGeo=new THREE.CylinderGeometry(.07,.105,6.4,10);
+const armGeo=new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(0,0,0),new THREE.Vector3(0,.5,0),new THREE.Vector3(.23,.88,0),new THREE.Vector3(.9,1.02,0),new THREE.Vector3(2.03,1.02,0)]),12,.045,7,false);
+const grassGeo=(()=>{const p=[],n=[];for(let i=0;i<7;i++){const a=i*2.399,x=Math.cos(a)*.19,z=Math.sin(a)*.19,h=.25+(i%3)*.075,sx=Math.cos(a)*.034,sz=Math.sin(a)*.034,bx=Math.cos(a)*.1,bz=Math.sin(a)*.1;p.push(x-sx,0,z-sz,x+sx,0,z+sz,x+bx,h,z+bz);n.push(0,1,0,0,1,0,0,1,0);}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(p,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(n,3));return g;})();
+''')
+change('game/src/scenery.js', "export function material(color,roughness=.9,metalness=0){const key=color+'-'+roughness+'-'+metalness;if(!materialCache.has(key)){const options={color,roughness,metalness},textured=surface&&facadeColors.has(color);if(textured){const tex=surface[color===0x944c36||color===0xad7751||color===0x9c8269?'brick':'plaster'];Object.assign(options,tex);options.normalScale=new THREE.Vector2(.45,.45);}const m=new THREE.MeshStandardMaterial(options);materialCache.set(key,textured?worldSurface(m,3):m);}return materialCache.get(key);}", """export function material(color,roughness=.9,metalness=0){const key=color+'-'+roughness+'-'+metalness;if(!materialCache.has(key)){const options={color,roughness,metalness},facade=surface&&facadeColors.has(color),ground=surface&&groundColors.has(color);if(facade||ground){const name=ground?(color===0xb3a76e?'grass':'green'):(color===0x944c36||color===0xad7751||color===0x9c8269?'brick':'plaster');Object.assign(options,surface[name]??surface.grass);options.normalScale=new THREE.Vector2(ground?.32:.45,ground?.32:.45);if(ground)options.color=color===0xb3a76e?0xbdb793:0xb4c79b;}if(glassColors.has(color)){options.roughness=.18;options.metalness=1;options.color=0xb5c8cb;}const m=new THREE.MeshStandardMaterial(options);materialCache.set(key,facade||ground?worldSurface(m,ground?2.5:3):m);}return materialCache.get(key);}""")
+change('game/src/scenery.js', 'function lamp(batch,x,z,yaw=0){batch.box(0x69716d,x,3.5,z,.09,7,.09);batch.box(0x69716d,x+Math.cos(yaw)*1.0,6.85,z-Math.sin(yaw)*1.0,2.1,.07,.07,yaw);batch.box(0xe3daba,x+Math.cos(yaw)*1.92,6.79,z-Math.sin(yaw)*1.92,.53,.1,.31,yaw);}', 'function lamp(batch,x,z,yaw=0){const metal=material(0x69716d,.42,1);batch.add(poleGeo,metal,x,3.2,z,1,1,1);batch.add(armGeo,metal,x,6.15,z,1,1,1,yaw);batch.add(trimGeo,material(0x66716d,.35,1),x+Math.cos(yaw)*1.98,7.12,z-Math.sin(yaw)*1.98,.72,.18,.38,yaw);batch.add(unitBox,material(0xe3daba),x+Math.cos(yaw)*2.03,7.018,z-Math.sin(yaw)*2.03,.57,.035,.26,yaw);}')
+change('game/src/scenery.js', 'dark=material(0x202b2e,.3)', 'dark=material(0x202b2e,.18,1)')
+change('game/src/scenery.js', "for(let j=3;j<h;j+=3.2)b(0x9babaf,xx,j,zz,15.6,.2,15.6,i*.1);", "for(let j=3;j<h;j+=3.2)b(0x9babaf,xx,j,zz,15.15,.075,15.15,i*.1);for(let side=0;side<4;side++)for(let k=-3;k<=3;k++){const a=i*.1,ox=side<2?k*2:(side===2?7.58:-7.58),oz=side<2?(side===0?7.58:-7.58):k*2;b(0x9babaf,xx+ox*Math.cos(a)+oz*Math.sin(a),h/2,zz-ox*Math.sin(a)+oz*Math.cos(a),side<2?.08:.065,h,side<2?.065:.08,i*.1);}")
+change('game/src/scenery.js', 'const batch=new Batch(scene),random=rng(19476),signs=[],pedestrians=[],streetlights=[];', 'const batch=new Batch(scene),random=rng(19476),signs=[],pedestrians=[],streetlights=[];const bladeMat=new THREE.MeshStandardMaterial({color:0x687344,roughness:1,side:THREE.DoubleSide});')
+change('game/src/scenery.js', 'const fieldOptions={};', "for(const c of CITIES){for(let i=0;i<160;i++){const x=c.x-178+random()*356,z=c.z+(random()>.5?1:-1)*(9.2+random()*2.7);if(nearestRoad(x,z).distance<8.7)continue;batch.add(grassGeo,bladeMat,x,.02,z,.8+random()*.7,.65+random()*.7,.8+random()*.7,random()*6.28);}for(let i=0;i<58;i++){const x=c.x-174+i*6,z=c.z-13;if(nearestRoad(x,z).distance>10)batch.add(unitBox,concrete,x,.045,z,5.8,.08,2.6);}}\n const fieldOptions={};")
+change('game/src/scenery.js', 'tree(batch,px,z+21,9+random()*4,false);if(j%2===0)', 'tree(batch,px,z+21,9+random()*4,false);if(nearestRoad(px,z-19).distance>10)tree(batch,px,z-19,11+random()*4,false);if(j%2===0)')
+print('Scene, mobile HUD, licence copy and trip estimates refined.')

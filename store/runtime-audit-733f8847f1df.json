@@ -1,0 +1,534 @@
+{
+  "date": "2026-10-01T06:38:46.040405+00:00",
+  "version": "1.0.0",
+  "files": [
+    {
+      "path": "app.js",
+      "bytes": 2856059,
+      "sha256": "77d2350ee75111a23472577f03e2b63243aca6a91ab10da39c6a056a9f49e4cd"
+    },
+    {
+      "path": "assets/asphalt-fine.png",
+      "bytes": 3938733,
+      "sha256": "b9eb3ee8f9959236173a75fab7345ba42d966e95c579b1e5dbe92d057e49b028"
+    },
+    {
+      "path": "assets/asphalt_02/asphalt_02_nor_gl_1k.jpg",
+      "bytes": 344184,
+      "sha256": "466c3507896bb6fd7cd98fd384329a367e887ba925fbe0b907ec01353b62006d"
+    },
+    {
+      "path": "assets/asphalt_02/asphalt_02_rough_1k.jpg",
+      "bytes": 313221,
+      "sha256": "28797a1a5744639901c9618277fb0abe3decee7b1b11c47e175c1b9cce4903d3"
+    },
+    {
+      "path": "assets/brick_wall_001/brick_wall_001_diffuse_1k.jpg",
+      "bytes": 265277,
+      "sha256": "a5e5f0fd7839c298470d453a2e06c466deef9fd706e2b988fbcbe7799c20d4ba"
+    },
+    {
+      "path": "assets/brick_wall_001/brick_wall_001_nor_gl_1k.jpg",
+      "bytes": 287636,
+      "sha256": "8b0b665edab3dc6dca75cea2dc185c10ebbe2e5c2d0da111008ba4ede04d484e"
+    },
+    {
+      "path": "assets/brick_wall_001/brick_wall_001_rough_1k.jpg",
+      "bytes": 104568,
+      "sha256": "aef12cd7b52dac2e4191d98e1218685342879c29f2574179d180ed55a309d77a"
+    },
+    {
+      "path": "assets/concrete_floor_02/concrete_floor_02_diff_1k.jpg",
+      "bytes": 460807,
+      "sha256": "d4bc34abc1cea2989368120338d378517345acfa75c232e52295b00e6da708dc"
+    },
+    {
+      "path": "assets/concrete_floor_02/concrete_floor_02_nor_gl_1k.jpg",
+      "bytes": 179139,
+      "sha256": "550c75ddccb4b3ed0d4c447b6ebabc982695f4cf1408e6adc7d2bf6bf789f84b"
+    },
+    {
+      "path": "assets/concrete_floor_02/concrete_floor_02_rough_1k.jpg",
+      "bytes": 145920,
+      "sha256": "c7ed094a76833cd766798eaa4ee4af72a5315a40a3a01883e6d6d581cefe659f"
+    },
+    {
+      "path": "assets/foliage.png",
+      "bytes": 2421712,
+      "sha256": "ee34ee8a3a17cc7917798c1352ec6f0ce644d0d0ae178003449b508d185fc477"
+    },
+    {
+      "path": "assets/grass-ground.png",
+      "bytes": 4031800,
+      "sha256": "b79c367210e0f2039923526c2d2d7c770c64ad39ea84128a11a5e2cde610d38e"
+    },
+    {
+      "path": "assets/grass-tuft.png",
+      "bytes": 2415531,
+      "sha256": "6d14f6e690fcf51758ef25b4ad38d1a38755f36ea2106d45f5553b0263b82f46"
+    },
+    {
+      "path": "assets/gravel_ground_01/gravel_ground_01_diff_1k.jpg",
+      "bytes": 463799,
+      "sha256": "1907bf8a2f68e6a24ef93073be2dcee5550025ccc0bfae2fb82eb5324234db88"
+    },
+    {
+      "path": "assets/gravel_ground_01/gravel_ground_01_nor_gl_1k.jpg",
+      "bytes": 374960,
+      "sha256": "a7f19e7bedffcb35ca54b24398d85ed2c75aa034ba0a333e8b17fa24264b8c98"
+    },
+    {
+      "path": "assets/gravel_ground_01/gravel_ground_01_rough_1k.jpg",
+      "bytes": 188993,
+      "sha256": "24945f650b022e791e60a6189cfd2476678f7fba8283ab5a91798172de7ccf76"
+    },
+    {
+      "path": "assets/kloofendal_38d_partly_cloudy_puresky/kloofendal_38d_partly_cloudy_puresky_1k.hdr",
+      "bytes": 1366191,
+      "sha256": "78882f3e560d7f6f2856f5ff071c52da51098507c391fdbb811dc9f79c403704"
+    },
+    {
+      "path": "assets/leafy_grass/leafy_grass_nor_gl_1k.jpg",
+      "bytes": 498564,
+      "sha256": "4f2585e62b023e358b999eb988b4b7e12721646325063b2df5450f18d847d695"
+    },
+    {
+      "path": "assets/leafy_grass/leafy_grass_rough_1k.jpg",
+      "bytes": 111632,
+      "sha256": "cabf25ab0eacb85ab6527a96e090d946cc42184640f35760a31efcc5af87f3a1"
+    },
+    {
+      "path": "assets/manifest.json",
+      "bytes": 1321,
+      "sha256": "68ba3a52b688910ea6b3f03534a1f521bfe2fad54716d2b20c8d89a069495983"
+    },
+    {
+      "path": "assets/models/apartment-lod.glb",
+      "bytes": 537584,
+      "sha256": "6fdfb39ede3222a9cd7f4febb3edc38f9f0bae3de1b6b2972930883f34f5f04d"
+    },
+    {
+      "path": "assets/models/apartment.glb",
+      "bytes": 2784824,
+      "sha256": "f8fa3e3f14a59370d2a239c4d267765cd301716fad272807d05a4a5e53bad744"
+    },
+    {
+      "path": "assets/models/tractor.glb",
+      "bytes": 3621420,
+      "sha256": "bba1b76101bfb42f4a2a1fc44f94d03b2b9e710e042f31ded99bef3dff3add05"
+    },
+    {
+      "path": "assets/plastered_wall/plastered_wall_diff_1k.jpg",
+      "bytes": 179236,
+      "sha256": "2e9ab8f71749e1be03ce5118fd94333a8e9be6d4e04952265ce9f8ab6dfe204b"
+    },
+    {
+      "path": "assets/plastered_wall/plastered_wall_nor_gl_1k.jpg",
+      "bytes": 277693,
+      "sha256": "bc80a017f5ee6ca9e257c895a3db686003d98daf3d41a191d0f8668f771cb545"
+    },
+    {
+      "path": "assets/plastered_wall/plastered_wall_rough_1k.jpg",
+      "bytes": 67162,
+      "sha256": "8a6191ae6b53066af52e0c33e0fe42b7c2eaebdfde9f8d5a4e8cee6edfc4a6f5"
+    },
+    {
+      "path": "assets/sky-cumulus.png",
+      "bytes": 1671839,
+      "sha256": "cdba6c6bd365b595ca5115fdddc39996591d2ce9a01adeee80c7e511268e9e49"
+    },
+    {
+      "path": "assets/spruce-bough.png",
+      "bytes": 2113316,
+      "sha256": "08b7875a096c598ee351dcab4af1052e8ea85bbb747d94418e7506ef6ed961fc"
+    },
+    {
+      "path": "assets/withered_grass/withered_grass_diff_1k.jpg",
+      "bytes": 464258,
+      "sha256": "e5fecb34c806d5c4542891db4552f92e118c233ff11c0d4830baf2e09ba18742"
+    },
+    {
+      "path": "assets/withered_grass/withered_grass_nor_gl_1k.jpg",
+      "bytes": 496141,
+      "sha256": "f2c139a182a763859a8e2785c8c2b55baec7d732a8f181247b1b48fb9c71aa89"
+    },
+    {
+      "path": "assets/withered_grass/withered_grass_rough_1k.jpg",
+      "bytes": 302298,
+      "sha256": "d5ca2318ce362b19b329a87330a1ad32e78d89e0442839c9dd8517175e61b91f"
+    },
+    {
+      "path": "icon.svg",
+      "bytes": 381,
+      "sha256": "88c4915ea11918325fcff25a26330cda2106c48bc1edc38b2c3dd651c203c74f"
+    },
+    {
+      "path": "index.html",
+      "bytes": 13208,
+      "sha256": "fe21038c548ba6a5be404f164b1e84d58cecb11057cb71aefdf048109fa02f16"
+    },
+    {
+      "path": "licenses.txt",
+      "bytes": 13680,
+      "sha256": "b517794aebefa9769a7955d75e46312acf906ac9c63697fcb54b9f3740232c96"
+    },
+    {
+      "path": "style.css",
+      "bytes": 40916,
+      "sha256": "646bdfb9b03a34c6bae76808b076d2359c93d354487fb7af0e9f7e9f55c5eb59"
+    }
+  ],
+  "markerHits": [],
+  "commentCandidates": [],
+  "commentWaivers": [
+    {
+      "path": "app.js",
+      "offset": 2638892,
+      "reason": "Manually checked escaped URL / dot-star regular expression in Three LoaderUtils.resolveURL",
+      "context": "esolveURL(A,I){return typeof A!=\"string\"||A===\"\"?\"\":(/^https?:\\/\\//i.test(I)&&/^\\//.test(A)&&(I=I.replace(/(^https?:\\/\\/[^"
+    },
+    {
+      "path": "app.js",
+      "offset": 2638908,
+      "reason": "Manually checked escaped URL / dot-star regular expression in Three LoaderUtils.resolveURL",
+      "context": "eturn typeof A!=\"string\"||A===\"\"?\"\":(/^https?:\\/\\//i.test(I)&&/^\\//.test(A)&&(I=I.replace(/(^https?:\\/\\/[^\\/]+).*/i,\"$1\"))"
+    },
+    {
+      "path": "app.js",
+      "offset": 2638955,
+      "reason": "Manually checked escaped URL / dot-star regular expression in Three LoaderUtils.resolveURL",
+      "context": "/\\//i.test(I)&&/^\\//.test(A)&&(I=I.replace(/(^https?:\\/\\/[^\\/]+).*/i,\"$1\")),/^(https?:)?\\/\\//i.test(A)||/^data:.*,.*$/i.te"
+    },
+    {
+      "path": "app.js",
+      "offset": 2638981,
+      "reason": "Manually checked escaped URL / dot-star regular expression in Three LoaderUtils.resolveURL",
+      "context": "A)&&(I=I.replace(/(^https?:\\/\\/[^\\/]+).*/i,\"$1\")),/^(https?:)?\\/\\//i.test(A)||/^data:.*,.*$/i.test(A)||/^blob:.*$/i.test(A"
+    }
+  ],
+  "metadata": {
+    "assets/asphalt-fine.png": {
+      "size": [
+        1254,
+        1254
+      ],
+      "mode": "RGB",
+      "keys": []
+    },
+    "assets/asphalt_02/asphalt_02_nor_gl_1k.jpg": {
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "keys": [
+        "jfif",
+        "jfif_version",
+        "jfif_unit",
+        "jfif_density"
+      ]
+    },
+    "assets/asphalt_02/asphalt_02_rough_1k.jpg": {
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "L",
+      "keys": [
+        "jfif",
+        "jfif_version",
+        "jfif_unit",
+        "jfif_density"
+      ]
+    },
+    "assets/brick_wall_001/brick_wall_001_diffuse_1k.jpg": {
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "keys": [
+        "jfif",
+        "jfif_version",
+        "jfif_unit",
+        "jfif_density"
+      ]
+    },
+    "assets/brick_wall_001/brick_wall_001_nor_gl_1k.jpg": {
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "keys": [
+        "jfif",
+        "jfif_version",
+        "jfif_unit",
+        "jfif_density"
+      ]
+    },
+    "assets/brick_wall_001/brick_wall_001_rough_1k.jpg": {
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "L",
+      "keys": [
+        "jfif",
+        "jfif_version",
+        "jfif_unit",
+        "jfif_density"
+      ]
+    },
+    "assets/concrete_floor_02/concrete_floor_02_diff_1k.jpg": {
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "keys": [
+        "jfif",
+        "jfif_version",
+        "jfif_unit",
+        "jfif_density"
+      ]
+    },
+    "assets/concrete_floor_02/concrete_floor_02_nor_gl_1k.jpg": {
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "keys": [
+        "jfif",
+        "jfif_version",
+        "jfif_unit",
+        "jfif_density"
+      ]
+    },
+    "assets/concrete_floor_02/concrete_floor_02_rough_1k.jpg": {
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "L",
+      "keys": [
+        "jfif",
+        "jfif_version",
+        "jfif_unit",
+        "jfif_density"
+      ]
+    },
+    "assets/foliage.png": {
+      "size": [
+        1254,
+        1254
+      ],
+      "mode": "RGBA",
+      "keys": []
+    },
+    "assets/grass-ground.png": {
+      "size": [
+        1254,
+        1254
+      ],
+      "mode": "RGB",
+      "keys": []
+    },
+    "assets/grass-tuft.png": {
+      "size": [
+        1254,
+        1254
+      ],
+      "mode": "RGBA",
+      "keys": []
+    },
+    "assets/gravel_ground_01/gravel_ground_01_diff_1k.jpg": {
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "keys": [
+        "jfif",
+        "jfif_version",
+        "jfif_unit",
+        "jfif_density"
+      ]
+    },
+    "assets/gravel_ground_01/gravel_ground_01_nor_gl_1k.jpg": {
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "keys": [
+        "jfif",
+        "jfif_version",
+        "jfif_unit",
+        "jfif_density"
+      ]
+    },
+    "assets/gravel_ground_01/gravel_ground_01_rough_1k.jpg": {
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "L",
+      "keys": [
+        "jfif",
+        "jfif_version",
+        "jfif_unit",
+        "jfif_density"
+      ]
+    },
+    "assets/kloofendal_38d_partly_cloudy_puresky/kloofendal_38d_partly_cloudy_puresky_1k.hdr": "#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n-Y 512 +X 1024\n\u0002\u0002\u0004\u0000LKLMLML\u0001MLMLML\u0003MMLM\u0001LMLM\u0001LML\u0003MMLML\u0001KLM\u0001LM\u0005LLLMMLMMLMLMLMLMLm\u0004nnmnmnm\u0004nmnnmnmnm\u0005nmmnmn\u0003mnnmnnmn\u0001on\u0001ononononnnmn\u0005mnmmmnmnmnm\u0004",
+    "assets/leafy_grass/leafy_grass_nor_gl_1k.jpg": {
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "keys": [
+        "jfif",
+        "jfif_version",
+        "jfif_unit",
+        "jfif_density"
+      ]
+    },
+    "assets/leafy_grass/leafy_grass_rough_1k.jpg": {
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "keys": [
+        "jfif",
+        "jfif_version",
+        "jfif_unit",
+        "jfif_density"
+      ]
+    },
+    "assets/models/apartment-lod.glb": {
+      "generator": "glTF 2.0",
+      "version": "2.0"
+    },
+    "assets/models/apartment.glb": {
+      "generator": "glTF 2.0",
+      "version": "2.0"
+    },
+    "assets/models/tractor.glb": {
+      "generator": "glTF 2.0",
+      "version": "2.0"
+    },
+    "assets/plastered_wall/plastered_wall_diff_1k.jpg": {
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "keys": [
+        "jfif",
+        "jfif_version",
+        "jfif_unit",
+        "jfif_density"
+      ]
+    },
+    "assets/plastered_wall/plastered_wall_nor_gl_1k.jpg": {
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "keys": [
+        "jfif",
+        "jfif_version",
+        "jfif_unit",
+        "jfif_density"
+      ]
+    },
+    "assets/plastered_wall/plastered_wall_rough_1k.jpg": {
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "L",
+      "keys": [
+        "jfif",
+        "jfif_version",
+        "jfif_unit",
+        "jfif_density"
+      ]
+    },
+    "assets/sky-cumulus.png": {
+      "size": [
+        1774,
+        887
+      ],
+      "mode": "RGB",
+      "keys": []
+    },
+    "assets/spruce-bough.png": {
+      "size": [
+        1254,
+        1254
+      ],
+      "mode": "RGBA",
+      "keys": []
+    },
+    "assets/withered_grass/withered_grass_diff_1k.jpg": {
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "keys": [
+        "jfif",
+        "jfif_version",
+        "jfif_unit",
+        "jfif_density"
+      ]
+    },
+    "assets/withered_grass/withered_grass_nor_gl_1k.jpg": {
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "keys": [
+        "jfif",
+        "jfif_version",
+        "jfif_unit",
+        "jfif_density"
+      ]
+    },
+    "assets/withered_grass/withered_grass_rough_1k.jpg": {
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "keys": [
+        "jfif",
+        "jfif_version",
+        "jfif_unit",
+        "jfif_density"
+      ]
+    }
+  },
+  "unpackedBytes": 33354003,
+  "zipSha256": "733f8847f1df5de4d880d87677f4408ddb2fea9beb0271ca98ea4f0d4d68fb36",
+  "extractedPath": "C:\\YandexGames\\games\\volga-haul\\tmp\\exact-zip-733f8847f1df",
+  "fileCount": 35,
+  "zipBytes": 25651911,
+  "crc": "PASS",
+  "previous": [
+    {
+      "original": "C:\\YandexGames\\games\\volga-haul\\ready\\dalnoboy-po-rossii-1.0.0.zip",
+      "file": "C:\\YandexGames\\games\\volga-haul\\store\\dalnoboy-po-rossii-1.0.0-local-20261001-093848-609850.zip",
+      "sha256": "bf8fff2dda2bfd9fc87bd33e0129f38ac4d68e09465d9297de310b3b1a94c587",
+      "consoleStatus": "not uploaded by this task"
+    }
+  ],
+  "zipPath": "C:\\YandexGames\\games\\volga-haul\\ready\\dalnoboy-po-rossii-1.0.0.zip"
+}
