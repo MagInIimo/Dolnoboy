@@ -10,6 +10,7 @@ import { L } from './surfaces.js';
 import { loadImage } from './textures.js';
 import { SpatialHash } from '../core/util.js';
 import { emitLandmarks, landmarkColliders } from './landmarks.js';
+import { landmarkMaterial } from './landmark-models.js';
 
 // Facade tiles rendered from 3D geometry in Blender (tools/blender/facades.py): colour, normal, glass mask.
 const BAKED = ['panelWhite', 'panelBeige', 'panelTower', 'khrushchevka', 'khrushchevkaBrick', 'redBrick', 'stalinkaYellow', 'stalinkaPeach', 'merchant', 'modernResidential', 'school'];
@@ -229,6 +230,7 @@ export class BuildingLayer {
     marks.setOrigin(x0, 0, z0);
     const inside = (x, z) => x >= x0 && x < x0 + size && z >= z0 && z < z0 + size;
     const trees = [];
+    const models = [];
     // cities overlapping this chunk
     for (const c of this.world.cities) {
       const reach = c.Rout + 200;
@@ -245,7 +247,7 @@ export class BuildingLayer {
       }
       for (const t of cb.trees) if (inside(t.x, t.z)) trees.push(t);
       if (inside(c.x, c.z)) {
-        emitLandmarks(lm, this.world, c, yard);
+        emitLandmarks(lm, this.world, c, yard, models);
         yield;
       }
     }
@@ -291,6 +293,19 @@ export class BuildingLayer {
     add(lm, this.material, true, null);
     add(yard, this.roadMaterial, false, null);
     add(marks, this.markMaterial, false, out.near);
+    // Blender-modelled landmarks (shared geometry, never disposed with the chunk)
+    for (const p of models) {
+      const mesh = new THREE.Mesh(p.model.geo, landmarkMaterial());
+      mesh.position.set(p.x, p.y, p.z);
+      mesh.rotation.y = p.heading;
+      mesh.castShadow = this.shadows;
+      mesh.receiveShadow = this.shadows;
+      mesh.userData.shared = true;
+      mesh.matrixAutoUpdate = false;
+      mesh.updateMatrix();
+      this.scene.add(mesh);
+      out.meshes.push(mesh);
+    }
     for (const m of out.far) m.visible = false;
     this.chunks.set(chunk.key, out);
     return out;
@@ -312,7 +327,7 @@ export class BuildingLayer {
     this.chunks.delete(chunk.key);
     for (const m of out.meshes) {
       this.scene.remove(m);
-      m.geometry.dispose();
+      if (!m.userData.shared) m.geometry.dispose();
     }
   }
 }

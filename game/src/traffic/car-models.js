@@ -64,7 +64,7 @@ export async function loadCarModels(url = 'assets/models/cars.glb') {
 
 export const carModels = () => models;
 
-function mergeNode(node) {
+export function mergeNode(node, roles = ROLES, prefix = /^car_/) {
   const parts = [];
   node.traverse((o) => {
     if (o.isMesh) parts.push(o);
@@ -86,7 +86,7 @@ function mergeNode(node) {
   let ib = 0;
   for (const m of parts) {
     const g = m.geometry;
-    const role = ROLES[(m.material.name || '').replace(/^car_/, '').replace(/\.\d+$/, '')] ?? ROLES.plastic;
+    const role = roles[(m.material.name || '').replace(prefix, '').replace(/\.\d+$/, '')] ?? ROLES.plastic;
     const [rgb, rough, metal, paint = 0, lamp = 0] = role;
     nm.getNormalMatrix(m.matrixWorld);
     const P = g.attributes.position;

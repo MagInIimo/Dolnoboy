@@ -56,7 +56,8 @@ export class CityBuildings {
     const rings = city.plan.rings;
     this.r0 = rings[0] * city.R;
     this.r1 = (rings[1] ?? 0.6) * city.R;
-    this.plaza = this.r0 * 0.78;
+    // a small square at the very centre; landmarks keep their own clearance
+    this.plaza = Math.min(this.r0 * 0.3, 45);
     this.sites = landmarkSites(world, city);
   }
 
@@ -181,9 +182,10 @@ export class CityBuildings {
     }
     // 2) infill on a jittered polar grid
     const maxR = c.Rout + 165;
-    for (let rad = this.r0 + 30; rad < maxR; rad += 26) {
+    // the historic centre inside the first ring is filled too, a little looser, around its landmarks
+    for (let rad = this.plaza + 34; rad < maxR; rad += 26) {
       const zoneProbe = this.zone(c.x + rad, c.z);
-      const spacing = zoneProbe === 'fringe' ? 30 : zoneProbe === 'outer' ? 42 : zoneProbe === 'middle' ? 34 : 30;
+      const spacing = zoneProbe === 'fringe' ? 30 : zoneProbe === 'outer' ? 42 : zoneProbe === 'middle' ? 34 : zoneProbe === 'core' ? 38 : 30;
       const steps = Math.max(6, Math.floor((2 * Math.PI * rad) / spacing));
       const off = r() * Math.PI * 2;
       for (let k = 0; k < steps; k++) {

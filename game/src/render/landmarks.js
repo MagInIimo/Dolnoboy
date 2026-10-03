@@ -2,6 +2,7 @@ import { F } from './facades.js';
 import { L as SL } from './surfaces.js';
 import { WATER_LEVEL } from '../core/geo.js';
 import { hashString, rng } from '../core/util.js';
+import { landmarkModel } from './landmark-models.js';
 
 const ONE = [1, 1, 1];
 
@@ -603,9 +604,9 @@ function stadium(L, a, b, h, layer, tint) {
 const KIND = {
   shipGoto: 'water', rotunda: 'water', flemishEmbankment: 'water', happinessLetters: 'water', portCranes: 'water', seaTerminal: 'water', cableCar: 'water',
   ostankino: 'ring', moscowCity: 'ring', stalinTower: 'ring', lakhta: 'ring', ekbCity: 'ring', tvTower: 'ring', steelPlant: 'out', truckPlant: 'out', carPlant: 'out',
-  waterTower: 'ring', brickWaterTower: 'plaza',
+  waterTower: 'ring', brickWaterTower: 'plaza', familyCenter: 'water',
 };
-const RADIUS = { kremlin: 82, kremlinSmall: 52, stoneFortress: 56, fortressWall: 100, kazanKremlin: 64, whiteKremlin: 64, familyCenter: 34, ostankino: 22, moscowCity: 70, stalinTower: 42, admiralty: 64, lakhta: 40, travelPalace: 40, rotunda: 12, aeolianHarp: 9, fireTower: 22, waterTower: 10, brickWaterTower: 10, tvTower: 16, rocketVostok: 34, rocketSoyuz: 20, shipGoto: 26, shipHouse: 40, grainExchange: 28, woodenQuarter: 46, flemishEmbankment: 58, cableCar: 40, happinessLetters: 34, ekbCity: 66, horseman: 12, borderBridge: 10, carPlant: 82, truckPlant: 92, steelPlant: 90, arenaOrange: 70, arenaVolga: 72, arenaRostov: 70, stadiumBowl: 68, planetarium: 22, conservatory: 30, seaTerminal: 40, portCranes: 56 };
+const RADIUS = { kremlin: 82, kremlinSmall: 52, stoneFortress: 56, fortressWall: 100, kazanKremlin: 118, whiteKremlin: 64, familyCenter: 38, ostankino: 22, moscowCity: 70, stalinTower: 42, admiralty: 64, lakhta: 40, travelPalace: 40, rotunda: 12, aeolianHarp: 9, fireTower: 22, waterTower: 10, brickWaterTower: 10, tvTower: 16, rocketVostok: 34, rocketSoyuz: 20, shipGoto: 26, shipHouse: 40, grainExchange: 28, woodenQuarter: 46, flemishEmbankment: 58, cableCar: 40, happinessLetters: 34, ekbCity: 66, horseman: 12, borderBridge: 10, carPlant: 82, truckPlant: 92, steelPlant: 90, arenaOrange: 70, arenaVolga: 72, arenaRostov: 70, stadiumBowl: 68, planetarium: 22, conservatory: 30, seaTerminal: 40, portCranes: 56 };
 
 export function landmarkSites(world, city) {
   if (city.landmarkSites) return city.landmarkSites;
@@ -674,29 +675,36 @@ export function landmarkSites(world, city) {
   return sites;
 }
 
-export function emitLandmarks(gb, world, city, yard) {
+// Procedural landmarks go into the chunk geometry; Blender-modelled ones are returned as placements.
+export function emitLandmarks(gb, world, city, yard, placements = []) {
   const sites = landmarkSites(world, city);
   const r = rng(hashString(city.id) ^ 0x9e37);
-  // paved central square
-  const r0 = city.plan.rings[0] * city.R * 0.8;
-  const n = 32;
-  const y = city.baseY + 0.05;
-  const center = yard.vertex(city.x, y, city.z, 0, 1, 0, city.x / 4, city.z / 4, { aLayer: SL.PAVING, aTint: [1, 1, 1] });
-  const ring = [];
-  for (let i = 0; i <= n; i++) {
-    const a = (i / n) * Math.PI * 2;
-    const x = city.x + Math.sin(a) * r0;
-    const z = city.z + Math.cos(a) * r0;
-    ring.push(yard.vertex(x, y, z, 0, 1, 0, x / 4, z / 4, { aLayer: SL.PAVING, aTint: [1, 1, 1] }));
-  }
-  for (let i = 0; i < n; i++) yard.tri(center, ring[i], ring[i + 1]);
   for (const s of sites) {
+    const base = world.terrainHeight(s.x, s.z);
+    const y = Math.min(base, city.baseY + 1) - 0.05;
+    const model = landmarkModel(s.id);
+    if (model) {
+      placements.push({ model, x: s.x, y, z: s.z, heading: s.heading });
+      continue;
+    }
     const fn = BUILD[s.id];
     if (!fn) continue;
-    const base = world.terrainHeight(s.x, s.z);
-    const L = new Local(gb, s.x, Math.min(base, city.baseY + 1) - 0.05, s.z, s.heading, hashString(s.id) % 997);
+    // a paved apron around the monument
+    const rad = s.radius + 10;
+    const n = 24;
+    const center = yard.vertex(s.x, y + 0.08, s.z, 0, 1, 0, s.x / 4, s.z / 4, { aLayer: SL.PAVING, aTint: [1, 1, 1] });
+    const ring = [];
+    for (let i = 0; i <= n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const x = s.x + Math.sin(a) * rad;
+      const z = s.z + Math.cos(a) * rad;
+      ring.push(yard.vertex(x, y + 0.08, z, 0, 1, 0, x / 4, z / 4, { aLayer: SL.PAVING, aTint: [1, 1, 1] }));
+    }
+    for (let i = 0; i < n; i++) yard.tri(center, ring[i], ring[i + 1]);
+    const L = new Local(gb, s.x, y, s.z, s.heading, hashString(s.id) % 997);
     fn(L, city, r);
   }
+  return placements;
 }
 
 export function landmarkColliders(world, city) {
