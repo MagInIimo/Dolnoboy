@@ -4,7 +4,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 // Traffic vehicles modelled in Blender (tools/blender/cars.py → assets/models/cars.glb).
 // Every kind is merged into one geometry with per-vertex colour and material parameters so a whole
 // kind draws as a single InstancedMesh: aMat = (roughness, metalness, paint, lamp id).
-// Lamp ids: 1 head, 2 tail, 3 indicator left, 4 indicator right, 5 beacon blue, 6 beacon red.
+// Lamp ids: 1 head, 2 tail, 3 indicator left, 4 indicator right, 5 beacon blue, 6 beacon red, 7 side marker.
 
 const ROLES = {
   paint: [[1, 1, 1], 0.3, 0.4, 1],
@@ -29,6 +29,8 @@ const ROLES = {
   amber: [[0.6, 0.3, 0.03], 0.15, 0.2, 0, 3],
   beacon_blue: [[0.05, 0.1, 0.5], 0.2, 0, 0, 5],
   beacon_red: [[0.5, 0.03, 0.03], 0.2, 0, 0, 6],
+  marker: [[0.6, 0.3, 0.03], 0.15, 0.2, 0, 7],
+  alu: [[0.6, 0.62, 0.64], 0.35, 0.8],
 };
 
 let models = null;
@@ -156,7 +158,8 @@ if (lampId > 0.5) {
   else if (lampId < 3.5) vGlow = vec3(1.0, 0.42, 0.03) * aLamp.z;
   else if (lampId < 4.5) vGlow = vec3(1.0, 0.42, 0.03) * aLamp.w;
   else if (lampId < 5.5) vGlow = vec3(0.08, 0.25, 1.0) * aBeacon.x;
-  else vGlow = vec3(1.0, 0.05, 0.03) * aBeacon.y;
+  else if (lampId < 6.5) vGlow = vec3(1.0, 0.05, 0.03) * aBeacon.y;
+  else vGlow = vec3(1.0, 0.42, 0.03) * aLamp.x * 0.3;
 }
 #endif`
       );

@@ -4,7 +4,7 @@
 # booleans, window glass gets an inset black frame and lamps/grilles/plates are projected onto the
 # surface. Each kind is exported twice: '<kind>' (near, wheels separate so they can spin) and
 # '<kind>_lo' (far, wheels merged). Materials are named 'car_<role>' and remapped in the game.
-import sys, math, json, time, bpy, bmesh
+import os, sys, math, json, time, bpy, bmesh
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
@@ -49,6 +49,8 @@ MDEF = {
     'amber': ((0.7, 0.35, 0.03), 0.12, 0.1),
     'beacon_blue': ((0.05, 0.12, 0.6), 0.2, 0.0),
     'beacon_red': ((0.6, 0.03, 0.03), 0.2, 0.0),
+    'marker': ((0.7, 0.35, 0.03), 0.15, 0.1),
+    'alu': ((0.62, 0.64, 0.66), 0.35, 0.8),
 }
 MLIST = list(MDEF)
 MATS = {}
@@ -920,6 +922,149 @@ def lorry(lod):
     return body
 
 
+TRACTOR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'game', 'assets', 'models', 'tractor.glb')
+TRACTOR_ROLES = {
+    'MAT-paint': 'paint', 'MAT-tyre_moulded': 'tyre', 'MAT-rubber': 'tyre', 'MAT-trim': 'trim', 'MAT-wheel_alloy': 'rim',
+    'MAT-steel': 'steel', 'MAT-reflector_amber': 'amber', 'MAT-reflector_red': 'tail', 'MAT-lamp_front': 'head',
+    'MAT-glass': 'glass', 'MAT-mirror': 'chrome', 'MAT-chrome': 'chrome', 'MAT-headlamp_lens': 'head',
+}
+
+
+def semi_tractor(lod):
+    """The player's tractor without the cab interior, decimated for traffic. Origin at the tandem centre."""
+    before = set(SC.objects)
+    bpy.ops.import_scene.gltf(filepath=TRACTOR)
+    new = [o for o in SC.objects if o not in before]
+    names = [o.name for o in new]
+    parts = []
+    for o in new:
+        if o.type != 'MESH' or any(k in o.name for k in ('dashboard', 'steering', 'interior')):
+            continue
+        o.data = o.data.copy()
+        o.data.transform(o.matrix_world)
+        me = o.data
+        roles = [TRACTOR_ROLES.get(m.name.split('.')[0], 'trim') if m else 'trim' for m in me.materials]
+        idx = []
+        for poly in me.polygons:
+            role = roles[poly.material_index] if poly.material_index < len(roles) else 'trim'
+            c = G(poly.center)
+            if role == 'head' and c.z < -1.0:
+                role = 'white'  # reversing lamps stay unlit
+            idx.append(mi(role))
+        me.materials.clear()
+        for n in MLIST:
+            me.materials.append(MATS[n])
+        for poly, k in zip(me.polygons, idx):
+            poly.material_index = k
+            poly.use_smooth = True
+        o2 = new_obj(o.name + '_x', me)
+        wheel = 'wheel' in o.name
+        ratio = (0.05 if wheel else 0.2) if not lod else (0.02 if wheel else 0.05)
+        if tris(o2) > 200:
+            m = o2.modifiers.new('dec', 'DECIMATE')
+            m.ratio = ratio
+            bake(o2)
+            remap_materials(o2.data)
+        parts.append(o2)
+    for n in names:
+        if n in bpy.data.objects:
+            bpy.data.objects.remove(bpy.data.objects[n])
+    body = parts[0]
+    body.name = 'semi' + ('_lo' if lod else '')
+    for o in parts[1:]:
+        join(body, o)
+    body.data.transform(__import__('mathutils').Matrix.Translation(V((0, 0, 1.95))))
+    body['vehicle'] = json.dumps({'len': 7.65, 'wid': 2.55, 'h': 3.9, 'wheel': '', 'r': 0.55, 'wheels': [], 'beacon': 0, 'kingpin': 0.35, 'front': 5.7})
+    return body
+
+
+def trailer(kind, lod):
+    """13.6 m semi-trailer, origin at the king pin on the ground, body toward -z."""
+    b = Buf()
+    W, front, L = 2.55, 1.3, 13.6
+    rear = front - L
+    deck, h = 1.28, 2.75
+    top = deck + h
+    axle = front - 8.6
+    hw = W / 2
+    # body shell: sides subdivided along z so the curtain can fold
+    n = 1 if kind == 'reefer' or lod else 70
+    zs = [front - (L * i / n) for i in range(n + 1)]
+    side_mat = 'paint' if kind == 'curtain' else 'box'
+    for sgn in (1, -1):
+        cols = []
+        for i, z in enumerate(zs):
+            fold = 0 if n == 1 or i in (0, n) else 0.025 * math.sin(i * math.pi * 0.9) * (1 - abs(math.sin(i * 0.37)) * 0.4)
+            x = sgn * (hw - 0.02 + fold)
+            cols.append([b.add((x, deck + 0.14, z)), b.add((x, top - 0.12, z))])
+        for i in range(n):
+            f = [cols[i][0], cols[i + 1][0], cols[i + 1][1], cols[i][1]]
+            b.face(f if sgn < 0 else list(reversed(f)), side_mat)
+    # roof, front wall, floor rails, top rails
+    box(b, (0, top - 0.04, (front + rear) / 2), (W - 0.02, 0.08, L), 'white')
+    box(b, (0, (deck + top) / 2, front - 0.03), (W, h, 0.06), 'white' if kind == 'curtain' else 'box')
+    box(b, (0, top - 0.08, (front + rear) / 2), (W + 0.02, 0.14, L + 0.01), 'alu')
+    box(b, (0, deck + 0.08, (front + rear) / 2), (W + 0.02, 0.18, L + 0.01), 'alu')
+    if kind == 'curtain' and not lod:
+        # vertical straps and the buckle line
+        z = front - 0.6
+        while z > rear + 0.4:
+            for sgn in (1, -1):
+                box(b, (sgn * (hw + 0.012), (deck + top) / 2, z), (0.012, h - 0.25, 0.05), 'trim')
+                box(b, (sgn * (hw + 0.02), deck + 0.32, z), (0.02, 0.08, 0.07), 'steel')
+            z -= 0.78
+    if kind == 'reefer':
+        box(b, (0, top - 0.95, front + 0.3), (2.0, 1.5, 0.5), 'white')
+        box(b, (0, top - 0.95, front + 0.56), (1.5, 0.9, 0.03), 'grille')
+        box(b, (0, top - 0.25, front + 0.3), (2.04, 0.1, 0.54), 'plastic')
+    # rear doors
+    box(b, (0, (deck + top) / 2, rear + 0.02), (W, h - 0.1, 0.06), 'white' if kind == 'curtain' else 'box')
+    if not lod:
+        for x in (-0.95, -0.35, 0.35, 0.95):
+            box(b, (x, (deck + top) / 2, rear - 0.02), (0.035, h - 0.3, 0.035), 'chrome')
+        box(b, (0, (deck + top) / 2, rear - 0.015), (0.01, h - 0.2, 0.01), 'seam')
+    # chassis
+    for sgn in (1, -1):
+        box(b, (sgn * 0.5, deck - 0.2, (front + rear) / 2 + 0.3), (0.12, 0.34, L - 0.8), 'under')
+    box(b, (0, deck - 0.05, (front + rear) / 2), (W - 0.1, 0.1, L - 0.2), 'under')
+    # landing gear
+    for sgn in (1, -1):
+        box(b, (sgn * 0.88, (deck - 0.1) / 2 + 0.1, -0.5), (0.13, deck - 0.2, 0.13), 'steel')
+        box(b, (sgn * 0.88, 0.06, -0.5), (0.3, 0.06, 0.3), 'steel')
+    box(b, (0, 0.75, -0.5), (1.6, 0.06, 0.06), 'steel')
+    # side guards between landing gear and axles
+    z0, z1 = -1.1, axle + 1.31 + 0.66
+    for sgn in (1, -1):
+        for y in (0.62, 0.92):
+            box(b, (sgn * (hw - 0.04), y, (z0 + z1) / 2), (0.03, 0.1, z0 - z1), 'alu')
+    # mudguards and flaps
+    for sgn in (1, -1):
+        box(b, (sgn * (hw - 0.22), 1.12, axle), (0.52, 0.04, 4.3), 'plastic')
+        box(b, (sgn * (hw - 0.22), 0.6, axle - 2.2), (0.5, 0.95, 0.02), 'plastic')
+    # rear underrun bar, lamps, plate
+    box(b, (0, 0.55, rear + 0.25), (W - 0.15, 0.14, 0.12), 'steel')
+    for sgn in (1, -1):
+        box(b, (sgn * 0.62, 0.55, rear + 0.6), (0.08, 0.5, 0.08), 'steel')
+        box(b, (sgn * (hw - 0.3), 0.82, rear + 0.08), (0.42, 0.16, 0.05), 'tail')
+        box(b, (sgn * (hw - 0.62), 0.82, rear + 0.08), (0.16, 0.16, 0.05), 'amber')
+        box(b, (sgn * (hw - 0.1), top - 0.05, rear + 0.05), (0.08, 0.08, 0.06), 'tail')
+        z = front - 1.0
+        while z > rear + 0.8:
+            box(b, (sgn * (hw + 0.005), deck + 0.05, z), (0.03, 0.05, 0.09), 'marker')
+            z -= 2.6
+    box(b, (0, 0.82, rear + 0.08), (0.54, 0.13, 0.03), 'plate')
+    # axles with wheels (baked, they are far away most of the time)
+    w = dict(R=0.54, W=0.38, rim_r=0.3, style='truck')
+    for dz in (-1.31, 0.0, 1.31):
+        box(b, (0, 0.54, axle + dz), (W - 0.6, 0.12, 0.12), 'under')
+        for sgn in (1, -1):
+            wheel(b, w['R'], w['W'], w['rim_r'], w['style'], 12 if lod else 18, (sgn * (hw - 0.04 - w['W'] / 2), w['R'], axle + dz), sgn, 1 if lod else 0)
+    name = 'trailer_' + kind + ('_lo' if lod else '')
+    o = new_obj(name, b.mesh(name))
+    o['vehicle'] = json.dumps({'len': L, 'wid': W, 'h': top, 'front': front, 'axle': axle, 'wheel': '', 'r': 0.54, 'wheels': [], 'beacon': 0})
+    return o
+
+
 def wheel_obj(name):
     w = WHEELS[name]
     b = Buf()
@@ -946,13 +1091,18 @@ def decimate(o, target):
 
 t0 = time.time()
 built = []
-for kind in ('sedan', 'hatch', 'suv', 'police', 'van', 'bus', 'lorry'):
+for kind in ('sedan', 'hatch', 'suv', 'police', 'van', 'bus', 'lorry', 'semi', 'trailer_curtain', 'trailer_reefer'):
     if ONLY and kind not in ONLY.split(','):
         continue
     for lod in (0, 1):
-        o = passenger(kind, lod) if kind in ('sedan', 'hatch', 'suv', 'police') else globals()[kind](lod)
+        if kind.startswith('trailer_'):
+            o = trailer(kind[8:], lod)
+        elif kind == 'semi':
+            o = semi_tractor(lod)
+        else:
+            o = passenger(kind, lod) if kind in ('sedan', 'hatch', 'suv', 'police') else globals()[kind](lod)
         if lod:
-            decimate(o, {'bus': 1600, 'lorry': 1500}.get(kind, 1200))
+            decimate(o, {'bus': 1600, 'lorry': 1500, 'semi': 2600, 'trailer_curtain': 1400, 'trailer_reefer': 1400}.get(kind, 1200))
         built.append(o)
         print(o.name, tris(o), 'tris')
 for name in WHEELS:
@@ -999,7 +1149,7 @@ def preview(o):
     """Three views (front 3/4, side, rear 3/4) of one model in a row."""
     spec = json.loads(o['vehicle'])
     temp = []
-    L = spec['len']
+    L = spec['len'] + (12 if o.name.startswith('semi') else 0)
     gap = L * 1.08
     for i, rot in enumerate((0, -35, -90, 145)):
         c = o.copy()
@@ -1008,6 +1158,13 @@ def preview(o):
         c.location = ((i - 1.5) * gap + (spec['wid'] * 0.6 - gap * 0.25 if i == 0 else 0), 0, 0)
         c.rotation_euler = (0, 0, math.radians(rot))
         temp.append(c)
+        if o.name.startswith('semi') and 'trailer_curtain' in bpy.data.objects:
+            t = bpy.data.objects['trailer_curtain' + ('_lo' if o.name.endswith('_lo') else '')].copy()
+            SC.collection.objects.link(t)
+            t.hide_render = False
+            t.parent = c
+            t.location = V((0, 0, 0.35))
+            temp.append(t)
         if not o.name.endswith('_lo'):
             for wx, wy, wz, steer, *ww in spec['wheels']:
                 src = bpy.data.objects['wheel_' + spec['wheel']]

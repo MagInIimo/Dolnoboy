@@ -14,7 +14,12 @@ const KINDS = {
   lorry: { len: 8.0, wid: 2.48, vmul: 0.82, weight: 2, accel: 1.0, truck: true },
   bus: { len: 12.0, wid: 2.55, vmul: 0.78, weight: 1, accel: 1.1, truck: true, city: true },
   police: { len: 4.42, wid: 1.77, vmul: 1.02, weight: 0.25, accel: 2.4, police: true },
+  semi: { len: 17.65, wid: 2.55, vmul: 0.8, weight: 0.4, hwWeight: 4.5, accel: 0.8, truck: true },
 };
+// Tractor-trailer layout relative to the vehicle centre: tandem centre ahead of it, king pin, trailer axles.
+const SEMI = { tandem: 3.125, wheelbase: 4.6, kingpin: 0.35, trailerAxle: 7.3 };
+const TARP = [0x2f5d9e, 0x2f5d9e, 0xd8dcdd, 0xd8dcdd, 0x8a9096, 0x2e6b3f, 0xb3302a, 0xd9a31c, 0x1f3c6e, 0x5b6770];
+const TRUCK_PAINT = [0xe9ebe8, 0xe9ebe8, 0xc0352b, 0x1f4f99, 0xf0a020, 0x2e6b3f, 0xb7bcc0, 0x1a1c1f, 0xd8d0b8];
 const KIND_IDS = Object.keys(KINDS);
 const PAINT = [0xe9ebe8, 0xe9ebe8, 0xb7bcc0, 0x8d949a, 0x1a1c1f, 0x2b3f66, 0x7a1f1d, 0x9a2d22, 0x2f4a36, 0xc9b99a, 0x4f5a63, 0x1f5c8a];
 const BUS_PAINT = [0xf2c230, 0xe9ebe8, 0x3a7bc8, 0xd8452f];
@@ -41,7 +46,7 @@ function simpleGeometry(kind) {
   const L = k.len;
   const W = k.wid;
   const box = (x, y, z, w, h, d, a) => gb.box(x, y, z, w, h, d, 0, a);
-  const truck = kind === 'lorry' || kind === 'bus';
+  const truck = kind === 'lorry' || kind === 'bus' || kind === 'semi';
   const r = truck ? 0.5 : kind === 'van' ? 0.35 : 0.31;
   if (truck) {
     box(0, 1.6, 0, W, 2.6, L, kind === 'bus' ? paint : white);
@@ -113,6 +118,12 @@ export class Traffic {
       this.meshes[kind] = { lo: make(src?.lo ?? simpleGeometry(kind), cap, true), hi: src?.hi ? make(src.hi, nearCap, true) : null, spec: src?.spec ?? null };
       this.counts[kind] = { hi: 0, lo: 0 };
     }
+    // semi-trailers drawn behind the AI tractors
+    this.trailerMeshes = {};
+    for (const t of ['curtain', 'reefer']) {
+      const src = models?.kinds['trailer_' + t];
+      if (src?.hi && src?.lo) this.trailerMeshes[t] = { hi: make(src.hi, 10, true), lo: make(src.lo, 24, true), hiN: 0, loN: 0 };
+    }
     this.wheels = {};
     for (const [name, w] of Object.entries(models?.wheels ?? {})) this.wheels[name] = { mesh: make(w.geo, nearCap * 4, false), w: w.spec.w, n: 0 };
     // soft contact shadow under every vehicle (cheap ambient occlusion)
@@ -131,7 +142,7 @@ export class Traffic {
     shadowTex.minFilter = THREE.LinearFilter;
     const shadowGeo = new THREE.PlaneGeometry(1, 1);
     shadowGeo.rotateX(-Math.PI / 2);
-    this.shadows = new THREE.InstancedMesh(shadowGeo, new THREE.MeshBasicMaterial({ color: 0x000000, map: shadowTex, transparent: true, opacity: 0.62, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }), cap);
+    this.shadows = new THREE.InstancedMesh(shadowGeo, new THREE.MeshBasicMaterial({ color: 0x000000, map: shadowTex, transparent: true, opacity: 0.62, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }), cap * 2);
     this.shadows.count = 0;
     this.shadows.frustumCulled = false;
     this.shadows.renderOrder = 1;
@@ -190,7 +201,7 @@ export class Traffic {
   // ---------- spawning ----------
   pickKind(city) {
     const r = this.random;
-    const pairs = KIND_IDS.filter((k) => city || !KINDS[k].city).map((k) => [k, KINDS[k].weight]);
+    const pairs = KIND_IDS.filter((k) => city || !KINDS[k].city).map((k) => [k, city ? KINDS[k].weight : KINDS[k].hwWeight ?? KINDS[k].weight]);
     return r.weighted(pairs);
   }
 
@@ -250,7 +261,9 @@ export class Traffic {
       plan: null,
       reserved: null,
       braking: false,
-      color: kind === 'bus' ? BUS_PAINT[Math.floor(r() * BUS_PAINT.length)] : kind === 'police' ? 0xf2f3f1 : PAINT[Math.floor(r() * PAINT.length)],
+      color: kind === 'bus' ? BUS_PAINT[Math.floor(r() * BUS_PAINT.length)] : kind === 'police' ? 0xf2f3f1 : kind === 'semi' ? TRUCK_PAINT[Math.floor(r() * TRUCK_PAINT.length)] : PAINT[Math.floor(r() * PAINT.length)],
+      trailer: kind === 'semi' ? (r() < 0.7 ? 'curtain' : 'reefer') : null,
+      tarp: TARP[Math.floor(r() * TARP.length)],
       collider: { x: 0, z: 0, w: spec.wid, d: spec.len, heading: 0, kind: 'car', h: 1.8 },
       box: null,
       hazard: false,
@@ -920,6 +933,52 @@ export class Traffic {
     return Math.abs(turn) > 0.5 && Math.abs(turn) < 3 ? Math.sign(turn) : 0;
   }
 
+  addShadow(i, x, y, z, yaw, w, l) {
+    if (i >= this.shadows.instanceMatrix.count) return;
+    this.scale.set(w, 1, l);
+    this.vec.set(x, y + 0.03, z);
+    this.local.compose(this.vec, this.quat.setFromAxisAngle(this.axisY, yaw), this.scale);
+    this.shadows.setMatrixAt(i, this.local);
+  }
+
+  // Point `off` metres ahead of the vehicle centre along its route: this edge, the coming turn, the next edge.
+  routePoint(car, off) {
+    if (car.mode === 'edge') {
+      const rem = (this.endS(car) - car.s) * car.dir;
+      if (off <= rem || !car.next) {
+        const p = this.net.pointAt(car.edge, car.s + car.dir * Math.min(off, rem), car.dir * car.lat);
+        return { x: p.x, y: p.y, z: p.z };
+      }
+      let plan = car.plan;
+      if (!plan || plan.node !== car.next.node) {
+        const g = car.ghostPlan;
+        if (!g || g.node !== car.next.node || g.from !== car.edge.id || g.toEdge !== car.next.edge) {
+          car.ghostPlan = this.planTurn(car);
+          car.ghostPlan.toEdge = car.next.edge;
+        }
+        plan = car.ghostPlan;
+      }
+      return this.turnPoint(plan, car.next, off - rem);
+    }
+    if (car.mode === 'turn') return this.turnPoint(car.turn, car.next, car.turn.d + off);
+    return { x: car.x + Math.sin(car.yaw) * off, y: car.y, z: car.z + Math.cos(car.yaw) * off };
+  }
+
+  turnPoint(T, nx, d) {
+    const len = T.pts ? T.len : 0;
+    if (d > len) {
+      const s = clamp(T.s1 + nx.dir * (d - len), 0, nx.edge.len);
+      const p = this.net.pointAt(nx.edge, s, nx.dir * this.laneLat(nx.edge.type, T.lane));
+      return { x: p.x, y: p.y, z: p.z };
+    }
+    let i = 0;
+    while (i < T.pts.length - 2 && T.pts[i + 1].d < d) i++;
+    const a = T.pts[i];
+    const b = T.pts[i + 1];
+    const t = clamp((d - a.d) / Math.max(1e-6, b.d - a.d), 0, 1);
+    return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t };
+  }
+
   placeWheels(car, spec, base) {
     const W = this.wheels[spec.wheel];
     if (!W) return;
@@ -963,8 +1022,22 @@ export class Traffic {
       const hi = !!M.hi && dx * dx + dz * dz < near2 && C.hi < M.hi.instanceMatrix.count;
       const mesh = hi ? M.hi : M.lo;
       const i = hi ? C.hi++ : C.lo++;
-      this.quat.setFromAxisAngle(this.axisY, car.yaw);
-      this.vec.set(car.x, car.y + 0.02, car.z);
+      // articulated trucks: the tractor follows the route ahead of the centre, the trailer trails behind it
+      const semi = car.kind === 'semi' && this.trailerMeshes[car.trailer];
+      let x = car.x;
+      let y = car.y;
+      let z = car.z;
+      let yaw = car.yaw;
+      if (semi) {
+        const a = this.routePoint(car, SEMI.tandem);
+        const f = this.routePoint(car, SEMI.tandem + SEMI.wheelbase);
+        x = a.x;
+        y = a.y;
+        z = a.z;
+        yaw = Math.atan2(f.x - a.x, f.z - a.z);
+      }
+      this.quat.setFromAxisAngle(this.axisY, yaw);
+      this.vec.set(x, y + 0.02, z);
       m.compose(this.vec, this.quat, this.one);
       mesh.setMatrixAt(i, m);
       this.color.setHex(car.color);
@@ -979,14 +1052,41 @@ export class Traffic {
         else if (side < 0) right = 2.5;
       }
       const tail = wrecked ? 0 : car.braking ? 2.4 : tailBase;
-      mesh.geometry.attributes.aLamp.setXYZW(i, wrecked ? 0 : head, tail, left, right);
+      const headOn = wrecked ? 0 : head;
+      mesh.geometry.attributes.aLamp.setXYZW(i, headOn, tail, left, right);
       const on = car.beacon;
       mesh.geometry.attributes.aBeacon.setXY(i, on && (flash === 0 || flash === 2) ? 4 : 0, on && (flash === 1 || flash === 3) ? 4 : 0);
       if (hi) this.placeWheels(car, M.spec, m);
-      this.scale.set(car.spec.wid + 0.45, 1, car.spec.len + 0.5);
-      this.vec.set(car.x, car.y + 0.03, car.z);
-      this.local.compose(this.vec, this.quat.setFromAxisAngle(this.axisY, car.yaw), this.scale);
-      this.shadows.setMatrixAt(shadowCount++, this.local);
+      if (semi) {
+        this.addShadow(shadowCount++, x + Math.sin(yaw) * 2.2, y, z + Math.cos(yaw) * 2.2, yaw, 2.9, 8.2);
+        const kx = x + Math.sin(yaw) * SEMI.kingpin;
+        const kz = z + Math.cos(yaw) * SEMI.kingpin;
+        let T = car.trail;
+        let ddx = T ? kx - T.x : 0;
+        let ddz = T ? kz - T.z : 0;
+        let l = Math.hypot(ddx, ddz);
+        if (!T || Math.abs(l - SEMI.trailerAxle) > 3) {
+          T = car.trail = { x: kx - Math.sin(yaw) * SEMI.trailerAxle, z: kz - Math.cos(yaw) * SEMI.trailerAxle };
+          ddx = kx - T.x;
+          ddz = kz - T.z;
+          l = SEMI.trailerAxle;
+        }
+        T.x = kx - (ddx / l) * SEMI.trailerAxle;
+        T.z = kz - (ddz / l) * SEMI.trailerAxle;
+        const tyaw = Math.atan2(ddx, ddz);
+        const TM = this.trailerMeshes[car.trailer];
+        const thi = hi && TM.hiN < TM.hi.instanceMatrix.count;
+        const tmesh = thi ? TM.hi : TM.lo;
+        const ti = thi ? TM.hiN++ : TM.loN++;
+        this.quat.setFromAxisAngle(this.axisY, tyaw);
+        this.vec.set(kx, y + 0.02, kz);
+        this.local.compose(this.vec, this.quat, this.one);
+        tmesh.setMatrixAt(ti, this.local);
+        this.color.setHex(car.tarp);
+        tmesh.setColorAt(ti, this.color);
+        tmesh.geometry.attributes.aLamp.setXYZW(ti, headOn, tail, left, right);
+        this.addShadow(shadowCount++, kx - Math.sin(tyaw) * 5.5, y, kz - Math.cos(tyaw) * 5.5, tyaw, 3.0, 14.2);
+      } else this.addShadow(shadowCount++, car.x, car.y, car.z, car.yaw, car.spec.wid + 0.45, car.spec.len + 0.5);
     }
     this.shadows.count = shadowCount;
     this.shadows.instanceMatrix.needsUpdate = true;
@@ -1002,6 +1102,17 @@ export class Traffic {
         mesh.geometry.attributes.aLamp.needsUpdate = true;
         mesh.geometry.attributes.aBeacon.needsUpdate = true;
       }
+    }
+    for (const T of Object.values(this.trailerMeshes)) {
+      for (const [mesh, n] of [[T.hi, T.hiN], [T.lo, T.loN]]) {
+        mesh.count = n;
+        mesh.visible = n > 0;
+        if (!n) continue;
+        mesh.instanceMatrix.needsUpdate = true;
+        mesh.instanceColor.needsUpdate = true;
+        mesh.geometry.attributes.aLamp.needsUpdate = true;
+      }
+      T.hiN = T.loN = 0;
     }
     for (const w of Object.values(this.wheels)) {
       w.mesh.count = w.n;
