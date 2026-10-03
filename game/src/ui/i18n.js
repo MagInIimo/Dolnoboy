@@ -1,3 +1,5 @@
+import { CITIES } from '../data/cities.js';
+
 export const TITLE = { ru: 'Дальнобой по России', en: 'Trucking Across Russia' };
 
 const RU = {
@@ -21,10 +23,12 @@ const RU = {
   rewardCash: 'Реклама: +{amount}', rewardFuel: 'Реклама: полный бак', rewardRepair: 'Реклама: бесплатный ремонт', rewardThanks: 'Награда получена', rewardFail: 'Реклама недоступна, попробуйте позже', rewardWait: 'Следующая награда через {min} мин',
   weather: 'Погода', time: 'Время', day: 'День', city: 'Город', companies: 'Компании', setGps: 'Проложить маршрут', youAreHere: 'Вы здесь',
   tutorial1: 'Добро пожаловать в рейс! Возьмите первый заказ на бирже грузов.', tutorial2: 'Езжайте по навигатору к складу. W/S — газ и тормоз, A/D — руль.', tutorial3: 'Подъедьте задним ходом под прицеп и нажмите T, чтобы подцепить.',
-  saving: 'Сохранено', loadingWorld: 'Строим дороги и города', loadingTextures: 'Загружаем текстуры', loadingFacades: 'Красим фасады', loadingTrees: 'Сажаем леса', loadingDone: 'Прогреваем двигатель',
-  tips: ['На трассе М-11 удобно обгонять — там по две полосы в каждую сторону.', 'Ретардер (R) бережёт тормоза на длинных спусках.', 'Камеры скорости штрафуют за превышение больше чем на 20 км/ч.', 'Ночью включайте фары (L), а на пустой трассе — дальний свет (K).', 'Срочные грузы платят больше, но опоздание съест бонус.', 'Хрупкий груз не любит резких поворотов и ударов.', 'Заправка дешевле, чем эвакуатор: следите за баком.', 'В Ижевске, Перми и Уфе ждут грузы для заводов Урала.'],
+  saving: 'Сохранено', loadingSdk: 'Подготовка к рейсу', loadingSub: '{n} городов, трассы М и Р, Волга, Ока и Дон', loadingSlow: 'Загрузка идёт дольше обычного. Можно подождать или повторить.', retry: 'Повторить загрузку',
+  loadFailed: 'Не удалось загрузить игру', loadFailedText: 'Проверьте соединение и попробуйте ещё раз. Прогресс сохранится.', noWebgl: 'Нужна поддержка WebGL 2', noWebglText: 'Ваш браузер или видеокарта не поддерживают WebGL 2. Обновите браузер или включите аппаратное ускорение.',
+  accidentAhead: 'Впереди ДТП — снизьте скорость', crashCar: 'ДТП! Повреждения грузовика и груза', loadingWorld: 'Строим дороги и города', loadingTextures: 'Загружаем текстуры', loadingFacades: 'Красим фасады', loadingTrees: 'Сажаем леса', loadingDone: 'Прогреваем двигатель',
+  tips: ['На трассах класса М — по две полосы в каждую сторону, там удобно обгонять.', 'Ретардер (R) бережёт тормоза на длинных спусках.', 'Камеры скорости штрафуют за превышение больше чем на 20 км/ч.', 'Ночью включайте фары (L), а на пустой трассе — дальний свет (K).', 'Срочные грузы платят больше, но опоздание съест бонус.', 'Хрупкий груз не любит резких поворотов и ударов.', 'Заправка дешевле, чем эвакуатор: следите за баком.', 'В Ижевске, Перми и Уфе ждут грузы для заводов Урала.'],
   howToPlayText: '',
-  aboutText: 'Симулятор дальнобойщика по городам России. 57 городов, реальные трассы, мосты через Волгу, Оку и Дон. Деньги в игре — только игровая валюта.',
+  aboutText: 'Симулятор дальнобойщика по городам России. {n} городов в правильном взаимном расположении (масштаб 1:40), федеральные трассы, мосты через Волгу, Оку, Дон и Каму. Деньги в игре — только игровые очки, реальных покупок и выплат нет.',
   licenses: 'Лицензии',
   menuHint: 'M — карта · J — биржа · P — пауза',
   stats: 'Статистика', company: 'Компания',
@@ -69,10 +73,12 @@ const EN = {
   rewardCash: 'Ad: +{amount}', rewardFuel: 'Ad: full tank', rewardRepair: 'Ad: free repair', rewardThanks: 'Reward received', rewardFail: 'Ad unavailable, try again later', rewardWait: 'Next reward in {min} min',
   weather: 'Weather', time: 'Time', day: 'Day', city: 'City', companies: 'Companies', setGps: 'Set route', youAreHere: 'You are here',
   tutorial1: 'Welcome aboard! Take your first job at the freight market.', tutorial2: 'Follow the GPS to the depot. W/S throttle and brake, A/D steer.', tutorial3: 'Reverse under the trailer and press T to couple it.',
-  saving: 'Saved', loadingWorld: 'Laying roads and building cities', loadingTextures: 'Loading textures', loadingFacades: 'Painting facades', loadingTrees: 'Planting forests', loadingDone: 'Warming up the engine',
-  tips: ['The M-11 has two lanes each way, handy for overtaking.', 'The retarder (R) saves your brakes on long descents.', 'Speed cameras fine you for going more than 20 km/h over the limit.', 'Use headlights at night (L) and high beam on empty roads (K).', 'Urgent cargo pays more, but being late eats the bonus.', 'Fragile cargo hates sharp turns and bumps.', 'Fuel is cheaper than a tow truck: watch your tank.', 'Izhevsk, Perm and Ufa wait for cargo for the Ural factories.'],
+  saving: 'Saved', loadingSdk: 'Preparing your trip', loadingSub: '{n} cities, M and R highways, the Volga, Oka and Don', loadingSlow: 'Loading is taking longer than usual. You can wait or try again.', retry: 'Try again',
+  loadFailed: 'Unable to load the game', loadFailedText: 'Check your connection and try again. Your progress is kept.', noWebgl: 'WebGL 2 is required', noWebglText: 'Your browser or graphics card does not support WebGL 2. Update the browser or enable hardware acceleration.',
+  accidentAhead: 'Accident ahead — slow down', crashCar: 'Collision! The truck and cargo are damaged', loadingWorld: 'Laying roads and building cities', loadingTextures: 'Loading textures', loadingFacades: 'Painting facades', loadingTrees: 'Planting forests', loadingDone: 'Warming up the engine',
+  tips: ['M-class highways have two lanes each way, handy for overtaking.', 'The retarder (R) saves your brakes on long descents.', 'Speed cameras fine you for going more than 20 km/h over the limit.', 'Use headlights at night (L) and high beam on empty roads (K).', 'Urgent cargo pays more, but being late eats the bonus.', 'Fragile cargo hates sharp turns and bumps.', 'Fuel is cheaper than a tow truck: watch your tank.', 'Izhevsk, Perm and Ufa wait for cargo for the Ural factories.'],
   howToPlayText: '',
-  aboutText: 'A trucking simulator across Russia. 57 cities, real highways, bridges over the Volga, Oka and Don. Money in the game is in-game currency only.',
+  aboutText: 'A trucking simulator across Russia. {n} cities in their true relative positions (1:40 scale), federal highways, bridges over the Volga, Oka, Don and Kama. Money in the game is only in-game points; there are no real purchases or payouts.',
   licenses: 'Licences',
   menuHint: 'M map · J jobs · P pause',
   stats: 'Statistics', company: 'Company',
@@ -102,6 +108,7 @@ export function makeT(lang) {
   const d = DICT[lang] ?? RU;
   return (key, vars) => {
     let s = d[key] ?? RU[key] ?? key;
+    if (typeof s === 'string' && s.includes('{n}')) s = s.replaceAll('{n}', String(CITIES.length));
     if (vars && typeof s === 'string') for (const [k, v] of Object.entries(vars)) s = s.replaceAll('{' + k + '}', v);
     return s;
   };

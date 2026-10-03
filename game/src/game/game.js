@@ -483,6 +483,10 @@ export class Game {
         this.cancelJob();
         this.closeMenu();
         break;
+      case 'towYes':
+        this.closeMenu();
+        await this.tow();
+        break;
       case 'gpsCity':
         this.setTarget(Number(v));
         this.hud.notify(t('gpsSet'));
@@ -920,9 +924,24 @@ export class Game {
         const fine = 3000;
         s.money -= fine;
         s.stats.fines += fine;
+        s.stats.accidents = (s.stats.accidents ?? 0) + 1;
         this.hud.notify(t('fineCrash', { price: this.money(fine) }), 'bad');
+        this.hud.flash();
       }
       this.fineCooldown = 1.5;
+    }
+    // events from the traffic simulation
+    for (const ev of this.traffic.takeEvents()) {
+      if (ev === 'redLight') {
+        const fine = 1000;
+        s.money -= fine;
+        s.stats.fines += fine;
+        this.hud.notify(t('fineRed', { price: this.money(fine) }), 'bad');
+        this.hud.flash();
+        this.sound.chime('bad');
+      } else if (ev.type === 'accidentAhead') {
+        this.hud.notify(t('accidentAhead'));
+      }
     }
     // fuel warnings
     if (p.fuel / p.tank < 0.12 && !this.fuelWarned) {
@@ -1002,7 +1021,7 @@ export class Game {
       this.trees.update(dt, this.engine.camera.position);
       this.props.update(dt, this.engine.camera.position, night);
       this.traffic.update(dt, this.engine.camera.position, night);
-      this.rain.update(dt, this.engine.camera, this.engine.env.weatherBlend.rain);
+      this.rain.update(dt, this.engine.camera, this.engine.env.weatherBlend.rain, this.rig.mode === 'cab');
       this.mirrors.setActive(this.rig.mode === 'cab');
       this.mirrors.render();
       this.engine.render();

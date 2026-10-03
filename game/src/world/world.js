@@ -405,7 +405,7 @@ export class World {
       e.bridges.push({ s0: e.ss[a], s1: e.ss[b], i0: a, i1: b, kind: 'river', deck, river: river?.river.id ?? 'water' });
       i = j;
     }
-    applyGrade(y, e.bridge, step * grade, n, y0, y1);
+    applyGrade(y, e.bridge, step * grade, n, y0, y1, true);
     e.ys.set(y);
   }
 
@@ -654,12 +654,14 @@ function movingAverage(y, r) {
   return out;
 }
 
-function applyGrade(y, fixed, g, n, y0, y1) {
+// Limits the grade between neighbours and keeps every sample reachable from both ends.
+// River decks may be capped by reachability (clampFixed); overpass decks must stay above the road below.
+function applyGrade(y, fixed, g, n, y0, y1, clampFixed = false) {
   for (let pass = 0; pass < 4; pass++) {
     for (let i = 0; i < n; i++) {
       const lo = Math.max(y0 - g * i, y1 - g * (n - 1 - i));
       const hi = Math.min(y0 + g * i, y1 + g * (n - 1 - i));
-      if (hi >= lo && !fixed[i]) y[i] = clamp(y[i], lo, hi);
+      if (hi >= lo && (clampFixed || !fixed[i])) y[i] = clamp(y[i], lo, hi);
     }
     for (let i = 1; i < n; i++) if (y[i] < y[i - 1] - g) y[i] = y[i - 1] - g;
     for (let i = n - 2; i >= 0; i--) if (y[i] < y[i + 1] - g) y[i] = y[i + 1] - g;

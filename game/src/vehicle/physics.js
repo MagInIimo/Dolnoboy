@@ -391,6 +391,11 @@ export class TruckPhysics {
         const fz = Math.cos(this.yaw);
         const normalSpeed = Math.abs(this.v * (fx * push.x + fz * push.z));
         if (normalSpeed > 0.8) {
+          if (normalSpeed > this.impact) {
+            // remembered so moving obstacles (traffic) can react to being hit
+            this.hitCollider = c;
+            this.hitPush = { x: push.x, z: push.z, speed: normalSpeed };
+          }
           this.impact = Math.max(this.impact, normalSpeed);
           this.impactKind = c.kind ?? 'building';
           this.damage = Math.min(1, this.damage + normalSpeed * 0.004);
