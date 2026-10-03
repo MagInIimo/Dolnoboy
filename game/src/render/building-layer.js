@@ -7,44 +7,80 @@ import { CityBuildings } from '../world/city-buildings.js';
 import { generateVillage } from '../world/villages.js';
 import { layoutLot } from '../world/lot-layout.js';
 import { L } from './surfaces.js';
+import { loadImage } from './textures.js';
 import { SpatialHash } from '../core/util.js';
 import { emitLandmarks, landmarkColliders } from './landmarks.js';
 
-export function facadeArray(size) {
+// Facade tiles rendered from 3D geometry in Blender (tools/blender/facades.py): colour, normal, glass mask.
+const BAKED = ['panelWhite', 'panelBeige', 'panelTower', 'khrushchevka', 'khrushchevkaBrick', 'redBrick', 'stalinkaYellow', 'stalinkaPeach', 'merchant', 'modernResidential', 'school'];
+
+export async function loadFacadeImages(base = 'assets/facades/') {
+  const out = {};
+  await Promise.all(
+    BAKED.map(async (n) => {
+      try {
+        const [col, nrm, msk] = await Promise.all([loadImage(base + n + '.webp'), loadImage(base + n + '_n.webp'), loadImage(base + n + '_m.png')]);
+        out[n] = { col, nrm, msk };
+      } catch (e) {
+        console.warn('facade', n, e);
+      }
+    })
+  );
+  return out;
+}
+
+// Colour (rgb) + glass mask (a), and a normal map per layer. Rows run bottom-up (v grows upward on walls).
+export function facadeArray(size, baked = {}) {
   const painted = paintFacades();
   const n = painted.length;
   const data = new Uint8Array(size * size * 4 * n);
+  const ndata = new Uint8Array(size * size * 4 * n);
   const tmp = document.createElement('canvas');
   tmp.width = tmp.height = size;
   const g = tmp.getContext('2d', { willReadFrequently: true });
-  painted.forEach((p, i) => {
+  const read = (img) => {
+    g.save();
     g.clearRect(0, 0, size, size);
-    g.drawImage(p.color, 0, 0, size, size);
-    const col = g.getImageData(0, 0, size, size).data;
-    g.drawImage(p.mask, 0, 0, size, size);
-    const mask = g.getImageData(0, 0, size, size).data;
+    g.translate(0, size);
+    g.scale(1, -1);
+    g.drawImage(img, 0, 0, size, size);
+    g.restore();
+    return g.getImageData(0, 0, size, size).data;
+  };
+  painted.forEach((p, i) => {
+    const b = baked[FACADES[i]];
+    const col = read(b ? b.col : p.color);
+    const mask = read(b ? b.msk : p.mask);
+    const nrm = b ? read(b.nrm) : null;
     const off = i * size * size * 4;
     for (let k = 0; k < size * size; k++) {
       data[off + k * 4] = col[k * 4];
       data[off + k * 4 + 1] = col[k * 4 + 1];
       data[off + k * 4 + 2] = col[k * 4 + 2];
       data[off + k * 4 + 3] = mask[k * 4];
+      ndata[off + k * 4] = nrm ? nrm[k * 4] : 128;
+      ndata[off + k * 4 + 1] = nrm ? nrm[k * 4 + 1] : 128;
+      ndata[off + k * 4 + 2] = nrm ? nrm[k * 4 + 2] : 255;
+      ndata[off + k * 4 + 3] = 255;
     }
   });
-  const tex = new THREE.DataArrayTexture(data, size, size, n);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.minFilter = THREE.LinearMipmapLinearFilter;
-  tex.magFilter = THREE.LinearFilter;
-  tex.generateMipmaps = true;
-  tex.anisotropy = 4;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.needsUpdate = true;
-  return tex;
+  const make = (arr, srgb) => {
+    const tex = new THREE.DataArrayTexture(arr, size, size, n);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    tex.generateMipmaps = true;
+    tex.anisotropy = 4;
+    tex.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+    tex.needsUpdate = true;
+    return tex;
+  };
+  return { color: make(data, true), normal: make(ndata, false) };
 }
 
-export function buildingMaterial(facadeTex) {
+export function buildingMaterial(facades) {
   const pbr = FACADES.map((name) => FACADE_PBR[name] ?? [0.9, 0.12, 0.0]);
-  const uniforms = { uFacade: { value: facadeTex }, uNight: { value: 0 } };
+  const uniforms = { uFacade: { value: facades.color }, uFacadeN: { value: facades.normal }, uNight: { value: 0 } };
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, metalness: 0 });
   return patchMaterial(m, {
     key: 'building',
@@ -54,7 +90,21 @@ export function buildingMaterial(facadeTex) {
     fragmentHead: `
       precision highp sampler2DArray;
       uniform sampler2DArray uFacade;
+      uniform sampler2DArray uFacadeN;
       uniform float uNight;
+      vec3 perturbFacade(vec3 n, vec3 pos, vec2 uv, vec3 ts) {
+        vec3 q0 = dFdx(pos);
+        vec3 q1 = dFdy(pos);
+        vec2 st0 = dFdx(uv);
+        vec2 st1 = dFdy(uv);
+        vec3 q1perp = cross(q1, n);
+        vec3 q0perp = cross(n, q0);
+        vec3 T = q1perp * st0.x + q0perp * st1.x;
+        vec3 B = q1perp * st0.y + q0perp * st1.y;
+        float det = max(dot(T, T), dot(B, B));
+        float scale = det == 0.0 ? 0.0 : inversesqrt(det);
+        return normalize(T * (ts.x * scale) + B * (ts.y * scale) + n * ts.z);
+      }
       varying float vLayer;
       varying float vSeed;
       varying vec3 vTint;
@@ -68,6 +118,13 @@ export function buildingMaterial(facadeTex) {
       diffuseColor.rgb *= fac.rgb * vTint;
       float glassMask = fac.a;
       vec3 pbrv = PBR[int(layerIdx)];
+    `,
+    fragmentNormal: `
+      #include <normal_fragment_maps>
+      if (abs(vWorldNormal.y) < 0.5) {
+        vec3 tsn = texture(uFacadeN, vec3(vFUv * 0.25, layerIdx)).xyz * 2.0 - 1.0;
+        normal = perturbFacade(normal, -vViewPosition, vFUv, tsn);
+      }
     `,
     fragmentRoughness: 'float roughnessFactor = mix(pbrv.x, pbrv.y, glassMask);',
     fragmentMetalness: 'float metalnessFactor = pbrv.z * (1.0 - glassMask * 0.7);',

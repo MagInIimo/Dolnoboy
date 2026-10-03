@@ -16,14 +16,14 @@ varying float vAlpha;
 void main() {
   vec3 p = position;
   float fall = uTime * aSpeed;
-  p.y = mod(p.y - fall, ${HEIGHT}.0);
-  vec2 drift = uWind * (${HEIGHT}.0 - p.y) * 0.05;
-  vec2 xz = mod(p.xz + drift - uCam.xz + ${BOX / 2}.0, ${BOX}.0) - ${BOX / 2}.0;
-  vec3 w = vec3(uCam.x + xz.x, uCam.y - ${HEIGHT / 2}.0 + p.y, uCam.z + xz.y);
+  p.y = mod(p.y - fall, ${HEIGHT.toFixed(1)});
+  vec2 drift = uWind * (${HEIGHT.toFixed(1)} - p.y) * 0.05;
+  vec2 xz = mod(p.xz + drift - uCam.xz + ${(BOX / 2).toFixed(1)}, ${BOX.toFixed(1)}) - ${(BOX / 2).toFixed(1)};
+  vec3 w = vec3(uCam.x + xz.x, uCam.y - ${(HEIGHT / 2).toFixed(1)} + p.y, uCam.z + xz.y);
   // streak: the lower end lags along the fall direction
   w.y -= aEnd * 0.55;
   w.xz -= aEnd * uWind * 0.03;
-  vAlpha = (1.0 - aEnd * 0.7) * smoothstep(${BOX / 2}.0, ${BOX / 4}.0, length(xz));
+  vAlpha = (1.0 - aEnd * 0.7) * smoothstep(${(BOX / 2).toFixed(1)}, ${(BOX / 4).toFixed(1)}, length(xz));
   // no drops inside the cab
   vAlpha *= smoothstep(uNearCut, uNearCut + 1.5, length(w - uCam));
   gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.0);
