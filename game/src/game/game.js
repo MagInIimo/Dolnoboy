@@ -548,7 +548,7 @@ export class Game {
       case 'help':
       case 'about':
         this.menus.from = this.menus.screen === 'pause' ? 'pause' : null;
-        this.menus.show(act, act === 'garage' ? { tab: 'upgrades' } : null);
+        this.menus.show(act, act === 'garage' ? { tab: 'trucks' } : null);
         this.updateRunning();
         break;
       case 'garageTab':

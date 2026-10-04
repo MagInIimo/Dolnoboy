@@ -7,7 +7,17 @@ import { SCALE } from '../core/geo.js';
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
-const TRAILER_COLOR = { curtain: '#9fb3c2', reefer: '#e6edf0', flatbed: '#c8a06a', tanker: '#d6dbe0', container: '#4f86c6', logger: '#8c6b45', lowloader: '#e0a51c' };
+// Side views of the trailer types (the freight market shows what will be coupled, not a letter badge).
+const WHEELS = '<circle cx="34" cy="19" r="2.6"/><circle cx="40" cy="19" r="2.6"/><circle cx="46" cy="19" r="2.6"/>';
+const TRAILER_ICON = {
+  curtain: `<svg viewBox="0 0 52 24"><path d="M2 3h48v13H2z" class="b"/><path d="M8 3v13M14 3v13M20 3v13M26 3v13M32 3v13M38 3v13M44 3v13" class="l"/><path d="M2 17h48"/>${WHEELS}</svg>`,
+  reefer: `<svg viewBox="0 0 52 24"><path d="M5 3h45v13H5z" class="b"/><path d="M1 5h4v8H1z"/><path d="M5 17h45"/>${WHEELS}</svg>`,
+  flatbed: `<svg viewBox="0 0 52 24"><path d="M2 13h48v3H2z"/><path d="M6 13V9h10v4M20 13V7h12v6M36 13V10h10v3" class="b"/>${WHEELS}</svg>`,
+  tanker: `<svg viewBox="0 0 52 24"><path d="M9 4h34a6 6 0 0 1 0 12H9a6 6 0 0 1 0-12z" class="b"/><path d="M20 4V2h6v2"/><path d="M4 16h46"/>${WHEELS}</svg>`,
+  container: `<svg viewBox="0 0 52 24"><path d="M2 4h48v11H2z" class="b"/><path d="M6 4v11M10 4v11M14 4v11M18 4v11M22 4v11M26 4v11M30 4v11M34 4v11M38 4v11M42 4v11M46 4v11" class="l"/><path d="M2 16h48"/>${WHEELS}</svg>`,
+  logger: `<svg viewBox="0 0 52 24"><path d="M2 15h48"/><path d="M6 15V4M18 15V4M30 15V4M44 15V4"/><path d="M4 7h44M4 10h44M4 13h44" class="w"/>${WHEELS}</svg>`,
+  lowloader: `<svg viewBox="0 0 52 24"><path d="M2 9h12v4h36v3H2z"/><path d="M18 13V7h20v6" class="b"/><circle cx="40" cy="19" r="2.6"/><circle cx="46" cy="19" r="2.6"/></svg>`,
+};
 
 export class Menus {
   constructor(frame, game) {
@@ -69,6 +79,7 @@ export class Menus {
     return `<div class="sheet"><div class="menu">
       <div class="brand">
         <h1>${esc(title[0])}<span>${esc(title.slice(1).join(' '))}</span></h1>
+        <img class="rig" src="assets/trucks/${esc(s.truck.model)}.webp" alt="" draggable="false">
         <div class="who">
           <div class="kv"><small>${t('money')}</small><b>${formatMoney(s.money, g.lang)}</b></div>
           <div class="kv"><small>${t('level')}</small><b>${level}</b><div class="xpbar"><i style="width:${Math.min(100, ((s.xp - lo) / Math.max(1, hi - lo)) * 100).toFixed(0)}%"></i></div></div>
@@ -101,17 +112,21 @@ export class Menus {
         const hours = Math.floor(o.deadlineMinutes / 60);
         const mins = o.deadlineMinutes % 60;
         return `<div class="job${o.locked ? ' locked' : ''}">
-          <div class="ico" style="background:${TRAILER_COLOR[cargo.trailer]}">${esc(name(cargo).slice(0, 2).toUpperCase())}</div>
-          <div><div class="t1">${esc(name(cargo))}${o.urgent ? `<span class="badge">${t('urgent')}</span>` : ''}${cargo.adr ? '<span class="badge adr">ADR</span>' : ''}</div><div class="t2">${esc(name(COMPANIES[o.from.company]))} · ${o.mass} ${t('t')} · ${esc(name(trailer))}</div></div>
-          <div><div class="t1">→ ${esc(name(toCity))}</div><div class="t2">${esc(name(COMPANIES[o.to.company]))}</div></div>
-          <div><div class="t1">${o.km} ${t('km')}</div><div class="t2">${t('deadline')}: ${hours} ${t('h')} ${mins ? mins + ' ' + t('min') : ''}</div></div>
+          <div class="ico" title="${esc(name(trailer))}">${TRAILER_ICON[cargo.trailer] ?? TRAILER_ICON.curtain}</div>
+          <div><div class="t1">${esc(name(cargo))}${o.urgent ? `<span class="badge">${t('urgent')}</span>` : ''}${cargo.adr ? '<span class="badge adr">ADR</span>' : ''}</div><div class="t2">${esc(name(COMPANIES[o.from.company]))}</div></div>
+          <div><div class="t1">${esc(name(toCity))}</div><div class="t2">${esc(name(COMPANIES[o.to.company]))}</div></div>
+          <div class="num">${o.mass} ${t('t')}</div>
+          <div class="num">${o.km} ${t('km')}</div>
+          <div class="num">${hours} ${t('h')} ${String(mins).padStart(2, '0')} ${t('min')}</div>
           <div class="money">${formatMoney(o.pay, g.lang)}</div>
-          <div>${o.locked ? `<button class="btn" disabled>${t('locked')} ${o.needLevel}</button>` : `<button class="btn primary" data-act="accept" data-v="${o.id}" ${g.state.job ? 'disabled' : ''}>${t('accept')}</button>`}</div>
+          <div>${o.locked ? `<button class="btn small" disabled>${t('locked')} ${o.needLevel}</button>` : `<button class="btn small primary" data-act="accept" data-v="${o.id}" ${g.state.job ? 'disabled' : ''}>${t('accept')}</button>`}</div>
         </div>`;
       })
       .join('');
     const active = g.state.job ? `<div class="kv" style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px"><div><small>${t('activeJob')}</small><b>${esc(g.currentJobLine())}</b></div><button class="btn danger" data-act="cancelJob">${t('cancelJob')}</button></div>` : '';
-    return `<div class="sheet">${this.head(t('jobMarketIn', { city: name(city) }))}<div class="sheet-body">${active}<div class="jobs">${rows || `<div class="empty">${t('noJobs')}</div>`}</div></div></div>`;
+    const en = g.lang === 'en';
+    const header = `<div class="job head"><div></div><div>${en ? 'Cargo · shipper' : 'Груз · отправитель'}</div><div>${en ? 'Destination' : 'Куда'}</div><div class="num">${en ? 'Weight' : 'Вес'}</div><div class="num">${en ? 'Distance' : 'Расстояние'}</div><div class="num">${t('deadline')}</div><div class="num">${en ? 'Pay' : 'Оплата'}</div><div></div></div>`;
+    return `<div class="sheet">${this.head(t('jobMarketIn', { city: name(city) }))}<div class="sheet-body">${active}<div class="jobs">${rows ? header + rows : `<div class="empty">${t('noJobs')}</div>`}</div></div></div>`;
   }
 
   r_map(g, t) {
@@ -254,8 +269,8 @@ export class Menus {
   r_garage(g, t) {
     const s = g.state;
     const name = (o) => (g.lang === 'en' ? o.en : o.ru);
-    const tab = this.data?.tab ?? 'upgrades';
-    const tabs = ['upgrades', 'paint', 'trucks'].map((k) => `<button class="tab ${tab === k ? 'on' : ''}" data-act="garageTab" data-v="${k}">${t(k)}</button>`).join('');
+    const tab = this.data?.tab ?? 'trucks';
+    const tabs = ['trucks', 'upgrades', 'paint'].map((k) => `<button class="tab ${tab === k ? 'on' : ''}" data-act="garageTab" data-v="${k}">${t(k)}</button>`).join('');
     let body = '';
     const atService = g.atService();
     if (tab === 'upgrades') {
@@ -274,12 +289,20 @@ export class Menus {
         return `<button class="swatch ${s.truck.paint === p.id ? 'on' : ''}" style="background:${p.color}" data-act="paint" data-v="${p.id}" title="${esc(name(p))}"><small>${owned ? esc(name(p)) : formatMoney(p.price, g.lang)}</small></button>`;
       }).join('')}</div>`;
     } else {
-      body = `<div class="cards">${Object.entries(TRUCKS)
+      const nm = g.lang === 'en' ? 'N·m' : 'Н·м';
+      body = `<div class="trucks">${Object.entries(TRUCKS)
         .map(([id, tr]) => {
           const owned = s.truck.owned.includes(id);
           const current = s.truck.model === id;
-          return `<div class="card"><h4>${esc(name(tr))}</h4><div class="sub">${t('power')}: ${tr.power} ${t('hp')} · ${tr.torque} Н·м</div>
-          ${current ? `<button class="btn" disabled>${t('current')}</button>` : owned ? `<button class="btn primary" data-act="truck" data-v="${id}">${t('select')}</button>` : `<button class="btn primary" data-act="truck" data-v="${id}" ${s.money < tr.price ? 'disabled' : ''}>${t('buy')} · ${formatMoney(tr.price, g.lang)}</button>`}</div>`;
+          const action = current
+            ? `<button class="btn small" disabled>${t('current')}</button>`
+            : owned
+              ? `<button class="btn small" data-act="truck" data-v="${id}">${t('select')}</button>`
+              : `<button class="btn small primary" data-act="truck" data-v="${id}" ${s.money < tr.price ? 'disabled' : ''}>${t('buy')}</button>`;
+          return `<div class="truck-card${current ? ' on' : ''}"><img src="assets/trucks/${id}.webp" alt="" loading="lazy" draggable="false">
+            <div class="tc-body"><h4>${esc(name(tr))}</h4>
+            <div class="specs"><span><b>${tr.power}</b> ${t('hp')}</span><span><b>${tr.torque}</b> ${nm}</span><span><b>${tr.axles.replace('x', '×')}</b></span></div>
+            <div class="tc-foot"><span class="price">${owned ? t('owned') : tr.price ? formatMoney(tr.price, g.lang) : '—'}</span>${action}</div></div></div>`;
         })
         .join('')}</div>`;
     }

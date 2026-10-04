@@ -2116,6 +2116,7 @@ def preview(objs, spec, path):
         'dash': ((e[0] - 0.1, e[1] - 0.05, e[2] + 0.1), (e[0], e[1] - 0.45, e[2] + 1.2), 24),
         'mirror': ((spec['mirror_L']['centre'][0] + 1.2, spec['mirror_L']['centre'][1] + 0.3, cf + 1.6) if 'mirror_L' in spec else (3, 3, cf + 2), tuple(spec['mirror_L']['centre']) if 'mirror_L' in spec else (1.5, 3, cf), 40),
         'rear': ((0.0, 2.2, rear - 7.0), (0, 1.4, rear), 40),
+        'thumb': ((6.4, 2.3, cf + 5.6), (0.2, 1.75, (cf + rear) / 2 + 0.6), 36),
     }
     sc.render.resolution_x = 960
     sc.render.resolution_y = 600
@@ -2142,6 +2143,14 @@ def preview(objs, spec, path):
         cam.data.lens = lens
         cam.data.clip_start = 0.03
         f = path.replace('.png', '-%s-%s.png' % (spec['id'], name))
+        sc.render.film_transparent = name == 'thumb'
+        ground = bpy.data.objects.get('ground')
+        if ground:
+            ground.hide_render = name == 'thumb'
+        if name == 'thumb':
+            sc.render.resolution_x, sc.render.resolution_y = 640, 360
+        else:
+            sc.render.resolution_x, sc.render.resolution_y = 960, 600
         sc.render.filepath = f
         bpy.ops.render.render(write_still=True)
         files.append(f)
