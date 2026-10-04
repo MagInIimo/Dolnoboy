@@ -1,0 +1,454 @@
+{
+  "date": "2026-10-04T02:25:55.248986+00:00",
+  "version": "2.0.0",
+  "files": [
+    {
+      "path": "index.html",
+      "bytes": 7169,
+      "sha256": "e4bf71219ff54b748f8c677f498eeb9b2e5375d82bcbbb8b262c5d7893d694fc"
+    },
+    {
+      "path": "style.css",
+      "bytes": 20021,
+      "sha256": "bc853f347eeb4081d46b8b39941336e9069ab51f0dab0de4fddb5d289b8f17ea"
+    },
+    {
+      "path": "app.js",
+      "bytes": 1043379,
+      "sha256": "acef0dd980834a051238417bd728d23cc185092582582d4de507c061ed4a2923"
+    },
+    {
+      "path": "icon.svg",
+      "bytes": 381,
+      "sha256": "88c4915ea11918325fcff25a26330cda2106c48bc1edc38b2c3dd651c203c74f"
+    },
+    {
+      "path": "licenses.txt",
+      "bytes": 6887,
+      "sha256": "09e861c45b7e28082e512e1c8df2e13d783eb4b0310b5deb5ab1bd36e7f9267d"
+    },
+    {
+      "path": "fonts/source-sans.woff",
+      "bytes": 71308,
+      "sha256": "43461fb8d905a7be996460535e10d3551fa312557cfd490a4671100b2632881c"
+    },
+    {
+      "path": "assets/asphalt_02/asphalt_02_diff_1k.jpg",
+      "bytes": 447409,
+      "sha256": "cf17aeb741cf6aae8b2493d8197deafe97dea5f9dcac38d55cd7e3ecb7281a93"
+    },
+    {
+      "path": "assets/asphalt_02/asphalt_02_nor_gl_1k.jpg",
+      "bytes": 344184,
+      "sha256": "466c3507896bb6fd7cd98fd384329a367e887ba925fbe0b907ec01353b62006d"
+    },
+    {
+      "path": "assets/brick_wall_001/brick_wall_001_diffuse_1k.jpg",
+      "bytes": 265277,
+      "sha256": "a5e5f0fd7839c298470d453a2e06c466deef9fd706e2b988fbcbe7799c20d4ba"
+    },
+    {
+      "path": "assets/brick_wall_001/brick_wall_001_nor_gl_1k.jpg",
+      "bytes": 287636,
+      "sha256": "8b0b665edab3dc6dca75cea2dc185c10ebbe2e5c2d0da111008ba4ede04d484e"
+    },
+    {
+      "path": "assets/concrete_floor_02/concrete_floor_02_diff_1k.jpg",
+      "bytes": 460807,
+      "sha256": "d4bc34abc1cea2989368120338d378517345acfa75c232e52295b00e6da708dc"
+    },
+    {
+      "path": "assets/concrete_floor_02/concrete_floor_02_nor_gl_1k.jpg",
+      "bytes": 179139,
+      "sha256": "550c75ddccb4b3ed0d4c447b6ebabc982695f4cf1408e6adc7d2bf6bf789f84b"
+    },
+    {
+      "path": "assets/facades/khrushchevka.webp",
+      "bytes": 18144,
+      "sha256": "ef4f527a3d6dff70b33609313fe3b6c8519a64f066bd6f3e1e633a21bc965bd3"
+    },
+    {
+      "path": "assets/facades/khrushchevkaBrick.webp",
+      "bytes": 26166,
+      "sha256": "9dc3a7cea8c12befe81b2ba8da3d1f4ec93dc8f7640c52b7ad03973b4bcf966e"
+    },
+    {
+      "path": "assets/facades/khrushchevkaBrick_m.png",
+      "bytes": 672,
+      "sha256": "5ef1318a6bb81b15102afc9cd5d06ae864a03811eaa2403b241a312a71e03a9d"
+    },
+    {
+      "path": "assets/facades/khrushchevkaBrick_n.webp",
+      "bytes": 36584,
+      "sha256": "7eaf033e2625092322c9e97e953e23257b3b8aec2cbcda208e6b2348584766e3"
+    },
+    {
+      "path": "assets/facades/khrushchevka_m.png",
+      "bytes": 672,
+      "sha256": "5ef1318a6bb81b15102afc9cd5d06ae864a03811eaa2403b241a312a71e03a9d"
+    },
+    {
+      "path": "assets/facades/khrushchevka_n.webp",
+      "bytes": 7828,
+      "sha256": "0522be3af9578485bbfee879e40a5c56d96d5ec67b0dad646dc441273230d3d4"
+    },
+    {
+      "path": "assets/facades/merchant.webp",
+      "bytes": 65440,
+      "sha256": "9ee741ab5da363c2f2f253639dccb57e696be422abb23506a274902f8c783619"
+    },
+    {
+      "path": "assets/facades/merchant_m.png",
+      "bytes": 601,
+      "sha256": "cefcf1023f61694a64b3f3b755c332662cb9b27bae057053c9b21b3d830a5fd6"
+    },
+    {
+      "path": "assets/facades/merchant_n.webp",
+      "bytes": 30968,
+      "sha256": "1013a7b8d823d1747183ef5b10593b21f68208ca50700f7b0e38418394fe9182"
+    },
+    {
+      "path": "assets/facades/modernResidential.webp",
+      "bytes": 8802,
+      "sha256": "e5ddc71cd60fd80fd960f91f3290142396bd7379b612a94681e6785f8da0a25a"
+    },
+    {
+      "path": "assets/facades/modernResidential_m.png",
+      "bytes": 720,
+      "sha256": "5649d85b36bb028dba1018284653113807b316b5b104721bf820bf7e650124b5"
+    },
+    {
+      "path": "assets/facades/modernResidential_n.webp",
+      "bytes": 7448,
+      "sha256": "6c6ce157c700a357ae51d677b4983118e11ce0f65b8f0e1c5a2ae8f992f77c03"
+    },
+    {
+      "path": "assets/facades/panelBeige.webp",
+      "bytes": 18314,
+      "sha256": "89148453494262879466f67f09a559dff516ef06ea62d8ff9abe51b5f060f0bf"
+    },
+    {
+      "path": "assets/facades/panelBeige_m.png",
+      "bytes": 746,
+      "sha256": "c666f469c7175d858ca1d6670787ff629c4e015ebd16c6117ac864033adf9e4b"
+    },
+    {
+      "path": "assets/facades/panelBeige_n.webp",
+      "bytes": 6552,
+      "sha256": "2179ad8138f4c3e138b4803ceb1b9aebeaebb04933fdbea89fd30be7969278ed"
+    },
+    {
+      "path": "assets/facades/panelTower.webp",
+      "bytes": 14094,
+      "sha256": "34326af5c2cd028a0bf5f56baaac436c821c6afd6ab0dc7b4e146246c986832a"
+    },
+    {
+      "path": "assets/facades/panelTower_m.png",
+      "bytes": 682,
+      "sha256": "2da18cfb518a586e683fe9747a8ceda1b522fc9692821093f9124eb164ac2791"
+    },
+    {
+      "path": "assets/facades/panelTower_n.webp",
+      "bytes": 6142,
+      "sha256": "504a461f28f288ffca952099f858a7558bd9da1875c9e1589b72aed5b06bd127"
+    },
+    {
+      "path": "assets/facades/panelWhite.webp",
+      "bytes": 14784,
+      "sha256": "e49976d2d8a02c408ce1f3bec084f9fd067dfc924a49f10ce00f58dbb89e1f6f"
+    },
+    {
+      "path": "assets/facades/panelWhite_m.png",
+      "bytes": 746,
+      "sha256": "c666f469c7175d858ca1d6670787ff629c4e015ebd16c6117ac864033adf9e4b"
+    },
+    {
+      "path": "assets/facades/panelWhite_n.webp",
+      "bytes": 6704,
+      "sha256": "37564ac28160693d17c4f54f8ee28e320ca3950d143d0b218a70859e1907cbeb"
+    },
+    {
+      "path": "assets/facades/redBrick.webp",
+      "bytes": 59050,
+      "sha256": "b85c300c28a69868828c17d3e93503753ed836bacbff7f12c090359234d10b60"
+    },
+    {
+      "path": "assets/facades/redBrick_m.png",
+      "bytes": 683,
+      "sha256": "b4f4486bfd1f452b9aea636d0713af26e549b95fcb2c7b73e174e0462792ad3f"
+    },
+    {
+      "path": "assets/facades/redBrick_n.webp",
+      "bytes": 34610,
+      "sha256": "788ea3dc718b24d3083a7a7c55f75ad96083d4550343e9fb442d89b80f6d2173"
+    },
+    {
+      "path": "assets/facades/school.webp",
+      "bytes": 15940,
+      "sha256": "3e4bf9a199c0b8810edf735df3bc5b890319390a92189174c6e45b7428b71c06"
+    },
+    {
+      "path": "assets/facades/school_m.png",
+      "bytes": 742,
+      "sha256": "8752bd1bf10244477fa3bdea6a2d9a8e5015d970599774a238a2b57b234fa87f"
+    },
+    {
+      "path": "assets/facades/school_n.webp",
+      "bytes": 9366,
+      "sha256": "70bbdf23d6f98ee6eda555a705fa1f4e2185bd7d833ec3e092381fb9ad041164"
+    },
+    {
+      "path": "assets/facades/stalinkaPeach.webp",
+      "bytes": 17320,
+      "sha256": "552409a3eb3fc6ceb09e8f939fcf41fef62dab24cd546c7a6e3240e274856a73"
+    },
+    {
+      "path": "assets/facades/stalinkaPeach_m.png",
+      "bytes": 735,
+      "sha256": "32dcf75acf240b27430e1bc859e6675eb15cebc2dbd787c8724ff69b3d649fc5"
+    },
+    {
+      "path": "assets/facades/stalinkaPeach_n.webp",
+      "bytes": 10292,
+      "sha256": "6b28fbdda39f35551c2ddbef83958f10bb610812fc8334d47ace5eb9db1e1c53"
+    },
+    {
+      "path": "assets/facades/stalinkaYellow.webp",
+      "bytes": 17784,
+      "sha256": "0aa2dbc8418646a04a2616be9affa9131acdea689f45dae4d85221153a057113"
+    },
+    {
+      "path": "assets/facades/stalinkaYellow_m.png",
+      "bytes": 713,
+      "sha256": "5d42a2025063246327801f5bb88969ba5c6fa780bb0768d5c12de86078845e48"
+    },
+    {
+      "path": "assets/facades/stalinkaYellow_n.webp",
+      "bytes": 10332,
+      "sha256": "90086a3a20596a9025f5ce9581f7b46ae5a88d9a1563c953e9ba8d291c4108e8"
+    },
+    {
+      "path": "assets/gravel_ground_01/gravel_ground_01_diff_1k.jpg",
+      "bytes": 463799,
+      "sha256": "1907bf8a2f68e6a24ef93073be2dcee5550025ccc0bfae2fb82eb5324234db88"
+    },
+    {
+      "path": "assets/gravel_ground_01/gravel_ground_01_nor_gl_1k.jpg",
+      "bytes": 374960,
+      "sha256": "a7f19e7bedffcb35ca54b24398d85ed2c75aa034ba0a333e8b17fa24264b8c98"
+    },
+    {
+      "path": "assets/leafy_grass/leafy_grass_diff_1k.jpg",
+      "bytes": 438481,
+      "sha256": "e67437fb3b6267bf4c59e2d10870c5a7d27c4a9f8fe1930b7861dd7ec123785c"
+    },
+    {
+      "path": "assets/leafy_grass/leafy_grass_nor_gl_1k.jpg",
+      "bytes": 498564,
+      "sha256": "4f2585e62b023e358b999eb988b4b7e12721646325063b2df5450f18d847d695"
+    },
+    {
+      "path": "assets/models/cars.glb",
+      "bytes": 975112,
+      "sha256": "7b7134da78c449c4cb3a82721aa3dcf3adfdccb5d1b798343f01037a305b5fa5"
+    },
+    {
+      "path": "assets/models/landmarks.glb",
+      "bytes": 786280,
+      "sha256": "e1a094215f9e0fe28d319dfeb4173c9eba69569239edcc218295646f43d3f404"
+    },
+    {
+      "path": "assets/models/tractor.glb",
+      "bytes": 1344048,
+      "sha256": "08947bc41a9133154b17ac23d9bba277272a0aa03d37640a3714a32a8a09293e"
+    },
+    {
+      "path": "assets/photo/asphalt-fine.jpg",
+      "bytes": 459457,
+      "sha256": "f74f97e7d7b70db520fda88dfa59fd8e9bba9df71522ee387f4aef3175d75bf1"
+    },
+    {
+      "path": "assets/photo/foliage.webp",
+      "bytes": 541244,
+      "sha256": "bd1e1bec98dca006e1e4665820fcc837b37eab11364bc4f3c35142e477a6c17c"
+    },
+    {
+      "path": "assets/photo/grass-ground.jpg",
+      "bytes": 553404,
+      "sha256": "bd44b31e88a2362d67076b0cf51279a6857206295330d2cb18cca99573093803"
+    },
+    {
+      "path": "assets/photo/grass-tuft.webp",
+      "bytes": 591258,
+      "sha256": "5281521fc175542cc71bd422bd9da0f43c39ac9addfd4dfadcc2f6f1e6b99ade"
+    },
+    {
+      "path": "assets/photo/sky-cumulus.jpg",
+      "bytes": 169960,
+      "sha256": "ca6bd26d42f060b1856386e452c39ba095ef6f548f628bb5129bfedddf20f487"
+    },
+    {
+      "path": "assets/photo/spruce-bough.webp",
+      "bytes": 430258,
+      "sha256": "9ae980304c7519867d42383eac37e15e2b2bfb40149f8d99c8445b360b38c3e6"
+    },
+    {
+      "path": "assets/plastered_wall/plastered_wall_diff_1k.jpg",
+      "bytes": 179236,
+      "sha256": "2e9ab8f71749e1be03ce5118fd94333a8e9be6d4e04952265ce9f8ab6dfe204b"
+    },
+    {
+      "path": "assets/plastered_wall/plastered_wall_nor_gl_1k.jpg",
+      "bytes": 277693,
+      "sha256": "bc80a017f5ee6ca9e257c895a3db686003d98daf3d41a191d0f8668f771cb545"
+    },
+    {
+      "path": "assets/trucks/atlant.glb",
+      "bytes": 491556,
+      "sha256": "98aac6b33c12fe72528247361be07f48371b438361bb2bde59dab67a4731b61f"
+    },
+    {
+      "path": "assets/trucks/atlant.webp",
+      "bytes": 12038,
+      "sha256": "47426f9d8bdec5dc0a40445d788aea8f4686b95934ec65477f389894c05c1284"
+    },
+    {
+      "path": "assets/trucks/buran.glb",
+      "bytes": 468720,
+      "sha256": "1b0690c1ea962af299b100bec9aba6812472c1f6dc4e5b4ee4afb065a2e8b1f8"
+    },
+    {
+      "path": "assets/trucks/buran.webp",
+      "bytes": 11296,
+      "sha256": "ef8021b59b979a68ca49912237aaac42f9363f34fd845080b59b18f9eb8c6630"
+    },
+    {
+      "path": "assets/trucks/enisey.glb",
+      "bytes": 478904,
+      "sha256": "2502f3b4effd818d9752e1a2d1c765a2db78ab665066018051876add71dd5e9c"
+    },
+    {
+      "path": "assets/trucks/enisey.webp",
+      "bytes": 11578,
+      "sha256": "4536ba0d96c94d79d848d8e8301dbd633b5a2cc1ce640251e6a03fffd6b10e3d"
+    },
+    {
+      "path": "assets/trucks/ladoga.glb",
+      "bytes": 452500,
+      "sha256": "16a687200f93e5fe71437efda60f6bdc46e2a7cf55bccc34109f6734673208a7"
+    },
+    {
+      "path": "assets/trucks/ladoga.webp",
+      "bytes": 10920,
+      "sha256": "1c54c96404d5a19fa73c3becaf60dba7b3b2fd7a427b35534ec730d28967eb2c"
+    },
+    {
+      "path": "assets/trucks/neman.glb",
+      "bytes": 446236,
+      "sha256": "0cf71632e185af4db5e9802318ccc7cf8b7f694935922aac2ab08619e6dee9d6"
+    },
+    {
+      "path": "assets/trucks/neman.webp",
+      "bytes": 11388,
+      "sha256": "e828570217a5830d21b95bc6d05e51badd1f8fbdefaa6ba45c4f85ef027c9de8"
+    },
+    {
+      "path": "assets/trucks/orion.glb",
+      "bytes": 470828,
+      "sha256": "a36b728f6053e60d9083ee39177b23ba3684d88e28fa4971c4e1ee8f4e1ab515"
+    },
+    {
+      "path": "assets/trucks/orion.webp",
+      "bytes": 10754,
+      "sha256": "1947e36de398c0d2099d3ca2efbc333e0e66444c1a01b49889d4187a5c7fe923"
+    },
+    {
+      "path": "assets/trucks/polyus.glb",
+      "bytes": 474636,
+      "sha256": "a880c27428b68644bbbf1be52dc1c79d2895716b2f1511b52c49e511ccc0b15b"
+    },
+    {
+      "path": "assets/trucks/polyus.webp",
+      "bytes": 11600,
+      "sha256": "dc186f3c4663b622135d60eeb40554abef254147a7de7907ab3de1c34ce90446"
+    },
+    {
+      "path": "assets/trucks/sever.glb",
+      "bytes": 460304,
+      "sha256": "f71eba97ea53b356278161dd2ed84de125e3b7f54b8824aa2c65b7bf8b04a47a"
+    },
+    {
+      "path": "assets/trucks/sever.webp",
+      "bytes": 10424,
+      "sha256": "dda7adbc0d35fcd277ca2f2f073bf9963354778f6257fd96a8cb0b1c56c348e4"
+    },
+    {
+      "path": "assets/trucks/taiga.glb",
+      "bytes": 431476,
+      "sha256": "ad3fcbd351eed493e1c08d1b6d50f66840cd0d352d74233876b0b99f3b7e5c47"
+    },
+    {
+      "path": "assets/trucks/taiga.webp",
+      "bytes": 10950,
+      "sha256": "c6fe96073325d079551705d248238927bbc2abcc1594704e6e680e9173dd228b"
+    },
+    {
+      "path": "assets/trucks/titan.glb",
+      "bytes": 460048,
+      "sha256": "0f3034870eaf211945565014ece85a5129ab020365519689507cc4c122905661"
+    },
+    {
+      "path": "assets/trucks/titan.webp",
+      "bytes": 11074,
+      "sha256": "4de7df5963011342ea354c19cba78e3ee648111dcbbfd5633afe94886088108a"
+    },
+    {
+      "path": "assets/trucks/trucks-lo.glb",
+      "bytes": 980904,
+      "sha256": "4192c860c794f8524bc3075f4cc7e41f6503030e0eceb0c78de80e0b88016478"
+    },
+    {
+      "path": "assets/trucks/vega.glb",
+      "bytes": 471764,
+      "sha256": "d8eb33520d5e8e5aa6c6fc19b66f2fc38c018da61a48c0112cb1df0c50c42c49"
+    },
+    {
+      "path": "assets/trucks/vega.webp",
+      "bytes": 11226,
+      "sha256": "6cdf30e614c862b8414b6e9b49f56125108d28d18dac278c428908f9f31cd1d0"
+    },
+    {
+      "path": "assets/trucks/vektor.glb",
+      "bytes": 469840,
+      "sha256": "ea6cafac33ea8f2aa2e84d957271542640fda7b2cc516b362afea9dc12369678"
+    },
+    {
+      "path": "assets/trucks/vektor.webp",
+      "bytes": 12052,
+      "sha256": "87e3f381d7211dc6f05bb999b7dc59b2a48ad779c74450ffd456ca0e98ab3bf7"
+    },
+    {
+      "path": "assets/withered_grass/withered_grass_diff_1k.jpg",
+      "bytes": 464258,
+      "sha256": "e5fecb34c806d5c4542891db4552f92e118c233ff11c0d4830baf2e09ba18742"
+    },
+    {
+      "path": "assets/withered_grass/withered_grass_nor_gl_1k.jpg",
+      "bytes": 496141,
+      "sha256": "f2c139a182a763859a8e2785c8c2b55baec7d732a8f181247b1b48fb9c71aa89"
+    }
+  ],
+  "markerHits": [],
+  "externalUrls": [],
+  "checks": {
+    "sdkScript": true,
+    "noSourceMaps": true,
+    "totalBytes": 19321142,
+    "fileCount": 87
+  },
+  "archive": {
+    "path": "ready/dalnoboy-po-rossii-2.0.0.zip",
+    "bytes": 12924206,
+    "sha256": "7f31c98b406569291a7ae83f30cd63d042a0be9a3554bafbbf2050adbee5654c"
+  }
+}
