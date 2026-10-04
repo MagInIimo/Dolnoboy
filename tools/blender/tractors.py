@@ -944,12 +944,18 @@ def lamp_unit(b, mp, s, housing, cfg, off=0.012):
     """Headlamp: dark housing, chrome reflectors, projector lenses, daytime light signature, indicator."""
     M = (lambda poly: [(s * u, v) for u, v in poly])
     shape(b, mp, M(housing), off, cfg.get('bezel', 'trim'), depth=0.035, wall='trim')
-    inner = cfg.get('inner')
-    if inner:
-        shape(b, mp, M(inner), off + 0.004, 'darkchrome')
+    # reflector bowl filling the housing, slightly inset from its rim
+    cu = sum(p[0] for p in housing) / len(housing)
+    cv = sum(p[1] for p in housing) / len(housing)
+    inner = cfg.get('inner') or [(cu + (u - cu) * 0.9, cv + (v - cv) * 0.84) for u, v in housing]
+    shape(b, mp, M(inner), off + 0.004, 'darkchrome')
     for (u, v, r) in cfg.get('proj', ()):
-        shape(b, mp, M(circle(u, v, r * 1.25, 20)), off + 0.006, 'chrome', depth=0.004)
-        shape(b, mp, M(circle(u, v, r, 20)), off + 0.011, 'head', depth=0.004, wall='darkchrome')
+        r *= 1.12
+        # projector: chrome cup, black ring, glass lens with a bright core
+        shape(b, mp, M(circle(u, v, r * 1.35, 24)), off + 0.006, 'chrome', depth=0.004)
+        shape(b, mp, M(circle(u, v, r * 1.08, 24)), off + 0.009, 'trim', depth=0.003)
+        shape(b, mp, M(circle(u, v, r, 24)), off + 0.012, 'head', depth=0.004, wall='darkchrome')
+        shape(b, mp, M(circle(u, v, r * 0.45, 16)), off + 0.015, 'lens')
     for (u0, u1, v0, v1) in cfg.get('reflectors', ()):
         shape(b, mp, M(rrect(u0, u1, v0, v1, 0.02)), off + 0.007, 'head', depth=0.003, wall='chrome')
     for line in cfg.get('drl', ()):
@@ -1064,6 +1070,20 @@ def standard_face(b, S, F, BM):
     for k in (-0.55, 0.45):
         tube(b, [F.pt(k + 0.32, S['ws0'] + 0.03, 0.03), F.pt(k - 0.32, S['ws0'] + 0.38, 0.03)], 0.009, 'trim', 5)
         box(b, tuple(F.pt(k + 0.32, S['ws0'] + 0.02, 0.025)), (0.06, 0.04, 0.04), 'trim')
+    # the tilting front panel: a seam round it from under the windscreen to the lamp line
+    af = F.a(1.6)
+    pv0, pv1 = S['yfb'] + 0.4, S['ws0'] - 0.05
+    pu = af - 0.04
+    for pa, pb in (((-pu, pv0), (pu, pv0)), ((-pu, pv1), (pu, pv1)), ((-pu, pv0), (-pu, pv1)), ((pu, pv0), (pu, pv1))):
+        strip(b, F, [pa, pb], 0.008, 0.003, 'seam')
+    # dark air deflectors round the front corners of modern cabs
+    cm = st.get('cornerMat')
+    if cm:
+        Wc, Fc, rc = F.at(1.6)
+        u0 = af + 0.01
+        u1 = af + math.pi * rc / 2 + 0.1
+        for sgn in (1, -1):
+            shape(b, F, [(sgn * u, v) for u, v in rrect(u0, u1, S['yfb'] + 0.47, S['ws0'] - 0.03, 0.04)], 0.009, cm, depth=0.02)
     for extra in st.get('extras', ()):
         extra(b, S, F, BM)
 
@@ -1745,6 +1765,7 @@ def design(S):
     st = dict(visor=False, mirrorMat='paint', dashMat='dash', auto=True)
     lo_v0, lo_v1 = yfb + 0.04, yfb + 0.33  # lamp band in the lower corners
     if d == 'atlant':
+        st['cornerMat'] = 'plastic'
         st.update(
             grille=dict(corners=[(0.0, 1.4), (0.6, 1.4), (0.76, ws0 - 0.14), (0.0, ws0 - 0.14)], r=0.06, mesh=('h', 0.035),
                         bars=[(1.55 + k * 0.17, 1.55 + k * 0.17 + 0.05, 'darkchrome', 0.04) for k in range(4)], surround=(0.035, 'paint2', 0.02)),
@@ -1770,6 +1791,7 @@ def design(S):
             badge=dict(v=ws0 - 0.17, size=0.08, off=0.03, spacing=1.6, mat='badge'),
             bumper=dict(lowV=0.6), visor=False, mirrorMat='paint', extender='trim', sideIntake=False, dashMat='dash', seatInsert='seat2')
     elif d == 'titan':
+        st['cornerMat'] = 'grille'
         st.update(
             grille=dict(corners=[(0.0, 1.36), (0.56, 1.36), (0.72, 1.62), (0.84, ws0 - 0.14), (0.0, ws0 - 0.14)], r=0.07, mesh=('h', 0.028),
                         bars=[(ws0 - 0.42, ws0 - 0.36, 'chrome', 0.0, 0.26)], surround=None),
@@ -1792,6 +1814,7 @@ def design(S):
             lower=dict(corners=[(0.0, lo_v0), (0.5, lo_v0), (0.5, 1.26), (0.0, 1.26)], r=0.02, mesh=('h', 0.04)),
             bumper=dict(lowV=0.6, step=True), visor=True, visorMat='paint', visorD=0.3, extender='paint', sideIntake=False, dashMat='dash2', dashLower='dash', seatInsert='seat2')
     elif d == 'orion':
+        st['cornerMat'] = 'paint2'
         st.update(
             grille=dict(corners=[(0.0, 1.5), (0.8, 1.5), (0.84, ws0 - 0.22), (0.0, ws0 - 0.22)], r=0.09, mesh=('h', 0.03),
                         bars=[(1.6 + k * 0.155, 1.6 + k * 0.155 + 0.06, 'chrome', 0.0, 0.0) for k in range(3)], surround=None),
@@ -1804,6 +1827,7 @@ def design(S):
             bumper=dict(lowV=0.62, fogRect=(0.07, 0.035)), visor=False, extender='paint', sideIntake=False, dashMat='dash', seatInsert='seat2')
         st['extras'] = [lambda b, S, F, BM: text_on(b, F, S['badge'], 0.0, S['ws0'] - 0.13, 0.06, 0.02, 'badge', depth=0.01, spacing=1.3)]
     elif d == 'vektor':
+        st['cornerMat'] = 'plastic'
         st.update(
             grille=dict(corners=[(0.0, 1.32), (0.5, 1.32), (0.72, 1.56), (0.86, ws0 - 0.1), (0.0, ws0 - 0.1)], r=0.06,
                         bars=[(1.42 + k * 0.13, 1.42 + k * 0.13 + 0.07, 'paint', 0.02) for k in range(6)], surround=(0.035, 'darkchrome', 0.02)),
@@ -1815,6 +1839,7 @@ def design(S):
             lower=dict(corners=[(0.0, lo_v0), (0.46, lo_v0), (0.46, 1.27), (0.0, 1.27)], r=0.02, mesh=('grid', 0.035)),
             bumper=dict(lowV=0.64), visor=False, extender='paint', dashMat='dash', seatInsert='seat2')
     elif d == 'vega':
+        st['cornerMat'] = 'plastic'
         st.update(
             grille=dict(corners=[(0.0, 1.36), (0.52, 1.36), (0.8, 1.7), (0.8, ws0 - 0.2), (0.0, ws0 - 0.2)], r=0.06, mesh=('honey', 0.045), back='grille',
                         bars=[(ws0 - 0.42, ws0 - 0.36, 'chrome', 0.04, 0.3)], surround=(0.03, 'paint2', 0.02)),
@@ -1826,6 +1851,7 @@ def design(S):
             lower=dict(corners=[(0.0, lo_v0), (0.44, lo_v0), (0.44, 1.3), (0.0, 1.3)], r=0.02, mesh=('honey', 0.04)),
             bumper=dict(lowV=0.62), visor=False, extender='paint', dashMat='dash', seatInsert='seat2')
     elif d == 'buran':
+        st['cornerMat'] = 'plastic'
         st.update(
             grille=dict(corners=[(0.0, 1.34), (0.62, 1.34), (0.82, 1.5), (0.84, ws0 - 0.12), (0.0, ws0 - 0.12)], r=0.03, mesh=('h', 0.03),
                         bars=[(1.48 + k * 0.2, 1.48 + k * 0.2 + 0.09, 'grille', 0.0) for k in range(3)], surround=(0.03, 'plastic', 0.02)),
@@ -1860,6 +1886,7 @@ def design(S):
             bumper=dict(lowV=0.56, intake=(0.58, 0.66), intakeU=0.42, plateV=0.76, fogU=0.86, fogV=0.5, fogR=0.05), visor=True, visorMat='paint',
             visorD=0.2, extender=None, dashMat='dash2', dashLower='dash', auto=False, seatInsert='seat2', mirrorMat='trim')
     elif d == 'enisey':
+        st['cornerMat'] = 'plastic'
         st.update(
             grille=dict(corners=[(0.0, 1.36), (0.58, 1.36), (0.74, 1.6), (0.84, ws0 - 0.14), (0.0, ws0 - 0.14)], r=0.07,
                         bars=[(1.42 + k * 0.12, 1.42 + k * 0.12 + 0.05, 'chrome', 0.03) for k in range(7)], surround=(0.035, 'chrome', 0.022)),
