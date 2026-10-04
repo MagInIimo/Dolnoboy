@@ -20,6 +20,19 @@ export const ICONS = {
   target: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/></svg>',
 };
 
+// Telltales drawn like the symbols of a real instrument cluster (ISO 2575 shapes, simplified).
+const TT = {
+  indL: '<svg viewBox="0 0 24 24"><path d="M3 12l8-7v4h10v6H11v4z"/></svg>',
+  indR: '<svg viewBox="0 0 24 24"><path d="M21 12l-8-7v4H3v6h10v4z"/></svg>',
+  low: '<svg viewBox="0 0 24 24"><path class="s" d="M14 5c4 0 7 3 7 7s-3 7-7 7c-1.2 0-2-.6-2-2V7c0-1.4.8-2 2-2z"/><path class="s" d="M9 7 3 9M9 11 3 13M9 15 3 17"/></svg>',
+  high: '<svg viewBox="0 0 24 24"><path class="s" d="M14 5c4 0 7 3 7 7s-3 7-7 7c-1.2 0-2-.6-2-2V7c0-1.4.8-2 2-2z"/><path class="s" d="M9 7H3M9 12H3M9 17H3"/></svg>',
+  cruise: '<svg viewBox="0 0 24 24"><path class="s" d="M5 17a8 8 0 1 1 14 0"/><path class="s" d="M12 13l4-5"/><circle cx="12" cy="13" r="1.6"/></svg>',
+  park: '<svg viewBox="0 0 24 24"><circle class="s" cx="12" cy="12" r="8"/><path class="s" d="M4 6a11 11 0 0 0 0 12M20 6a11 11 0 0 1 0 12"/><path d="M10 8h3a2.5 2.5 0 0 1 0 5h-1.6V16H10z"/></svg>',
+  ret: '<svg viewBox="0 0 24 24"><path class="s" d="M4 12a8 8 0 0 1 16 0"/><path class="s" d="M12 12V6M8 9l2 2M16 9l-2 2"/></svg>',
+  fuel: '<svg viewBox="0 0 24 24"><path class="s" d="M5 20V5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v15M4 20h11M5 10h9M14 8l3 2v7a1.5 1.5 0 0 0 3 0V9l-2-3"/></svg>',
+  wrench: '<svg viewBox="0 0 24 24"><path class="s" d="M14.5 6.5a4 4 0 0 0 5 5L12 19a2.1 2.1 0 0 1-3-3l7.5-7.5a4 4 0 0 1-5-5l2.5 2.5 2-2z"/></svg>',
+};
+
 const ARROWS = {
   left: '<svg viewBox="0 0 40 40"><path d="M26 34V20a6 6 0 0 0-6-6H10" stroke="#ffcf5c" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M15 7 8 14l7 7" stroke="#ffcf5c" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   right: '<svg viewBox="0 0 40 40"><path d="M14 34V20a6 6 0 0 1 6-6h10" stroke="#ffcf5c" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M25 7l7 7-7 7" stroke="#ffcf5c" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
@@ -34,8 +47,8 @@ export class Hud {
     const root = document.createElement('div');
     root.id = 'hud';
     root.innerHTML = `
-      <div class="job-card panel" hidden><div class="label"></div><div class="route"></div><div class="meta"></div></div>
-      <div class="maneuver panel" hidden><span class="ma"></span><div><div class="md"></div><div class="mt"></div></div></div>
+      <div class="job-card" hidden><div class="label"></div><div class="route"></div><div class="meta"></div></div>
+      <div class="maneuver" hidden><span class="ma"></span><div><div class="md"></div><div class="mt"></div></div></div>
       <div class="toolbar">
         <div class="money-chip pe" data-ui="profile"><small>₽</small><span class="money"></span></div>
         <button class="tbtn pe" data-ui="jobs" aria-label="jobs">${ICONS.jobs}</button>
@@ -44,30 +57,33 @@ export class Hud {
         <button class="tbtn pe" data-ui="pause" aria-label="pause">${ICONS.pause}</button>
       </div>
       <div class="notes"></div>
-      <div class="dash panel">
-        <div class="speed"><b class="spd">0</b><span class="spdu"></span></div>
-        <div class="col">
-          <div class="gearbox"><div class="gear">N</div><div class="rpm"><i></i></div></div>
-          <div class="bar fuelbar"><span class="fl"></span><div class="track"><i></i></div></div>
-          <div class="bar dmgbar"><span class="dl"></span><div class="track"><i></i></div></div>
-          <div class="lamps">
-            <span class="lamp l-ind-l">◀</span><span class="lamp blue l-lights">ФАР</span><span class="lamp green l-cruise">КРУИЗ</span><span class="lamp l-ret">R0</span><span class="lamp red l-park">P</span><span class="lamp l-ind-r">▶</span>
+      <div class="nav">
+        <div class="screen pe" data-ui="map"><canvas width="320" height="196"></canvas>
+          <div class="eta"><b class="gd"></b><small class="gt"></small></div>
+        </div>
+        <div class="navbar">
+          <div class="limit"><b>90</b></div>
+          <div class="cur"><b class="spd">0</b><small class="spdu"></small></div>
+          <div class="gear">N</div>
+          <div class="clock"><b class="clk"></b><small class="day"></small></div>
+        </div>
+        <div class="status">
+          <div class="meter fuel">${TT.fuel}<div class="seg">${'<i></i>'.repeat(10)}</div></div>
+          <div class="meter dmg">${TT.wrench}<b class="dmgv">0%</b></div>
+          <div class="tts">
+            <i class="tt green tt-ind-l">${TT.indL}</i><i class="tt green tt-low">${TT.low}</i><i class="tt blue tt-high">${TT.high}</i><i class="tt green tt-cruise">${TT.cruise}</i><i class="tt amber tt-ret">${TT.ret}<em>0</em></i><i class="tt red tt-park">${TT.park}</i><i class="tt green tt-ind-r">${TT.indR}</i>
           </div>
         </div>
       </div>
-      <div class="gps panel pe" data-ui="map">
-        <canvas width="300" height="200"></canvas>
-        <div class="strip"><div class="limit">90</div><div class="grow"><b class="gd"></b><small class="gt"></small></div><div class="clock"><b class="clk"></b><div class="wx"></div></div></div>
-      </div>
       <button class="context" hidden></button>
-      <div class="hint"></div>
       <div id="flash"></div>
       <div class="busy panel" hidden><i></i><span></span></div>
     `;
     frame.appendChild(root);
     this.root = root;
     this.q = (s) => root.querySelector(s);
-    this.minimap = new Minimap(this.q('.gps canvas'), game.world);
+    this.minimap = new Minimap(this.q('.nav canvas'), game.world);
+    this.segs = [...root.querySelectorAll('.fuel .seg i')];
     root.addEventListener('click', (e) => {
       const el = e.target.closest('[data-ui]');
       if (el) game.action(el.dataset.ui);
@@ -85,11 +101,8 @@ export class Hud {
   applyLanguage() {
     const t = this.game.t;
     this.q('.spdu').textContent = this.game.lang === 'en' ? 'km/h' : 'км/ч';
-    this.q('.fl').textContent = t('fuel');
-    this.q('.dl').textContent = t('damage');
-    this.q('.l-lights').textContent = this.game.lang === 'en' ? 'LIGHT' : 'ФАРЫ';
-    this.q('.l-cruise').textContent = this.game.lang === 'en' ? 'CRUISE' : 'КРУИЗ';
-    this.q('.hint').textContent = (this.game.lang === 'en' ? 'WASD drive · T trailer · Enter action · V camera · ' : 'WASD — езда · T — прицеп · Enter — действие · V — камера · ') + t('menuHint');
+    this.q('.fuel').title = t('fuel');
+    this.q('.dmg').title = t('damage');
   }
 
   notify(text, kind = '') {
@@ -138,29 +151,34 @@ export class Hud {
     const p = g.truck.physics;
     const s = g.state;
     const speed = Math.abs(p.v) * 3.6;
+    const limit = g.speedLimit ?? 90;
     this.q('.spd').textContent = String(Math.round(speed));
+    this.q('.cur').classList.toggle('over', speed > limit + 3);
     const gear = p.gear < 0 ? 'R' : p.gear === 0 ? 'N' : p.automatic ? 'A' + p.gear : String(p.gear);
     this.q('.gear').textContent = gear;
-    this.q('.rpm i').style.width = Math.min(100, (p.rpm / 2200) * 100).toFixed(1) + '%';
-    const fuel = p.fuel / p.tank;
-    this.q('.fuelbar .track i').style.width = (fuel * 100).toFixed(1) + '%';
-    this.q('.fuelbar').classList.toggle('warn', fuel < 0.15);
-    this.q('.dmgbar .track i').style.width = (p.damage * 100).toFixed(1) + '%';
+    const fuel = Math.max(0, Math.min(1, p.fuel / p.tank));
+    const lit = Math.ceil(fuel * 10 - 0.05);
+    this.segs.forEach((el, i) => (el.className = i < lit ? (fuel < 0.15 ? 'on low' : 'on') : ''));
+    this.q('.dmgv').textContent = Math.round(p.damage * 100) + '%';
+    this.q('.dmg').classList.toggle('warn', p.damage > 0.3);
     const blink = g.truck.blink % 0.8 < 0.42;
-    this.q('.l-ind-l').classList.toggle('on', (g.truck.indicator < 0 || g.truck.hazard) && blink);
-    this.q('.l-ind-r').classList.toggle('on', (g.truck.indicator > 0 || g.truck.hazard) && blink);
-    this.q('.l-lights').classList.toggle('on', g.truck.lightsOn);
-    this.q('.l-cruise').classList.toggle('on', p.cruise > 0);
-    this.q('.l-ret').classList.toggle('on', p.retarder > 0);
-    this.q('.l-ret').textContent = 'R' + p.retarder;
-    this.q('.l-park').classList.toggle('on', p.parking);
+    const tt = (cls, on) => this.q(cls).classList.toggle('on', !!on);
+    tt('.tt-ind-l', (g.truck.indicator < 0 || g.truck.hazard) && blink);
+    tt('.tt-ind-r', (g.truck.indicator > 0 || g.truck.hazard) && blink);
+    tt('.tt-low', g.truck.lightsOn && !g.truck.highBeam);
+    tt('.tt-high', g.truck.lightsOn && g.truck.highBeam);
+    tt('.tt-cruise', p.cruise > 0);
+    tt('.tt-ret', p.retarder > 0);
+    this.q('.tt-ret em').textContent = p.retarder > 0 ? String(p.retarder) : '';
+    tt('.tt-park', p.parking);
+    this.root.classList.toggle('cab', g.rig?.mode === 'cab');
     this.q('.money').textContent = formatMoney(s.money, g.lang).replace(/ ?₽| RUB/, '');
     // speed limit
-    this.q('.limit').textContent = String(g.speedLimit ?? 90);
-    // clock
+    this.q('.limit b').textContent = String(limit);
+    // clock and day
     const minutes = Math.floor(s.time % 1440);
     this.q('.clk').textContent = `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
-    this.q('.wx').textContent = g.weatherName();
+    this.q('.day').textContent = `${g.lang === 'en' ? 'day' : 'день'} ${Math.floor(s.time / 1440) + 1} · ${g.weatherName()}`;
     // navigation
     const nav = g.nav;
     const route = nav.route;
@@ -169,11 +187,11 @@ export class Hud {
       this.q('.gd').textContent = realKm >= 10 ? `${Math.round(realKm)} ${t('km')}` : `${realKm.toFixed(1)} ${t('km')}`;
       const hours = realKm * GAME_HOURS_PER_KM;
       const etaMin = Math.round(hours * 60);
-      this.q('.gt').textContent = g.targetLabel ?? '';
-      this.q('.gt').title = etaMin + ' ' + t('min');
+      const eh = Math.floor(etaMin / 60);
+      this.q('.gt').textContent = `${eh ? eh + ' ' + t('h') + ' ' : ''}${etaMin % 60} ${t('min')} · ${g.targetLabel ?? ''}`;
+      this.q('.eta').hidden = false;
     } else {
-      this.q('.gd').textContent = '—';
-      this.q('.gt').textContent = t('freeDrive');
+      this.q('.eta').hidden = true;
     }
     const man = this.q('.maneuver');
     const next = nav.next;

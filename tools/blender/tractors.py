@@ -1601,30 +1601,31 @@ def interior(b, S, eye):
         Wp, Fp, rp = S['cabSurf'].at(S['ws0'] + 0.4)
         ax = s * (Wp - 0.12)
         az = Fp - 0.12
-        tube(b, [(ax, S['ws0'] - 0.02, az - 0.02), (s * (Wp - 0.13), S['ws1'] - 0.02, az - S['rake'] - 0.02)], 0.06, 'panel', 8)
-        tube(b, [(s * (w - 0.12), S['ws0'] + 0.1, az - 0.18), (s * (w - 0.14), S['ws0'] + 0.6, az - S['rake'] * 0.6 - 0.18)], 0.016, 'dash2', 6)
+        tube(b, [(s * (Wp - 0.1), S['ws0'] - 0.02, az + 0.0), (s * (Wp - 0.11), S['ws1'] - 0.02, az - S['rake'] + 0.0)], 0.035, 'panel', 8)
+        tube(b, [(s * (w - 0.1), S['ws0'] + 0.15, az - 0.2), (s * (w - 0.11), S['ws0'] + 0.55, az - S['rake'] * 0.6 - 0.2)], 0.014, 'dash2', 6)
+        # curtains gathered behind the door, at the front of the sleeper
         for k in range(5):
-            zz = az - 0.22 - k * 0.035
+            zz = S['wz1'] - 0.06 - k * 0.035
             tube(b, [(s * (w - 0.09), S['wy0'] - 0.05, zz), (s * (w - 0.1 - (k % 2) * 0.02), (S['wy0'] + S['wy1']) / 2, zz), (s * (w - 0.09), S['top'] - 0.18, zz)], 0.018, 'curtain', 6)
     # overhead: shelf with lockers over the windscreen, centre console with radio and tachograph
     if S['roof'] != 'low':
-        oy = S['ws1'] + 0.12
-        oz = zd - S['rake'] - 0.4
-        rbox(b, (0, oy, oz), (2 * w - 0.3, 0.3, 0.42), 0.06, lmat, n=2)
+        oy = S['ws1'] + 0.16
+        oz = zd - S['rake'] - 0.36
+        rbox(b, (0, oy, oz), (2 * w - 0.3, 0.22, 0.36), 0.05, lmat, n=2)
         for i in range(4):
             u = -0.85 + i * 0.57
-            pl = Plane((u, oy, oz - 0.212), (-1, 0, 0), (0, 1, 0))
-            shape(b, pl, rrect(-0.26, 0.26, -0.11, 0.11, 0.04), 0.002, dmat, depth=0.004)
-            rbox(b, (u, oy - 0.1, oz - 0.22), (0.12, 0.025, 0.02), 0.008, 'dashtrim', n=1)
-        rbox(b, (0.0, oy - 0.22, oz - 0.05), (0.6, 0.16, 0.3), 0.03, lmat, n=2)
+            pl = Plane((u, oy, oz - 0.182), (-1, 0, 0), (0, 1, 0))
+            shape(b, pl, rrect(-0.26, 0.26, -0.08, 0.08, 0.04), 0.002, dmat, depth=0.004)
+            rbox(b, (u, oy - 0.07, oz - 0.19), (0.12, 0.022, 0.02), 0.008, 'dashtrim', n=1)
+        rbox(b, (0.0, oy - 0.15, oz + 0.02), (0.56, 0.1, 0.28), 0.03, lmat, n=2)
         for k, (u, wd) in enumerate(((-0.13, 0.22), (0.13, 0.22))):
-            pl = Plane((u, oy - 0.22, oz - 0.205), (-1, 0, 0), (0, 1, 0))
+            pl = Plane((u, oy - 0.15, oz - 0.122), (-1, 0, 0), (0, 1, 0))
             shape(b, pl, rrect(-wd / 2, wd / 2, -0.03, 0.03, 0.006), 0.002, 'display')
             shape(b, pl, rrect(-wd / 2 + 0.01, -wd / 2 + 0.07, -0.022, 0.022, 0.004), 0.004, 'button')
     # sun visors, interior light, rear-view of the bunk: mattress, curtain, storage under the bunk
     for s in (1, -1):
         Wv, Fv, rv = S['cabSurf'].at(S['ws1'] - 0.05)
-        rbox(b, (s * 0.55, S['ws1'] - 0.1, Fv - 0.16), (0.82, 0.24, 0.03), 0.012, 'panel', rot_x=0.45, n=2)
+        rbox(b, (s * 0.55, S['ws1'] + 0.02, Fv - 0.28), (0.82, 0.24, 0.025), 0.012, 'panel', rot_x=1.35, n=2)
     rbox(b, (0, S['top'] - 0.1, (zf + zr) / 2), (0.3, 0.03, 0.12), 0.012, 'lens', n=1)
     rbox(b, (0, fh + 0.5, zr + 0.4), (2 * w - 0.22, 0.16, 0.68), 0.06, 'seat', n=3)
     rbox(b, (0, fh + 0.36, zr + 0.4), (2 * w - 0.2, 0.12, 0.72), 0.02, lmat, n=1)

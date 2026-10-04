@@ -218,7 +218,10 @@ export class Minimap {
     this.scale += (want - this.scale) * 0.05;
     const s = this.scale;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = '#1b2329';
+    const bg = ctx.createLinearGradient(0, 0, 0, h);
+    bg.addColorStop(0, '#11161a');
+    bg.addColorStop(1, '#1a2026');
+    ctx.fillStyle = bg;
     ctx.fillRect(0, 0, w, h);
     const cx = w / 2;
     const cy = h * 0.68;
@@ -248,7 +251,7 @@ export class Minimap {
         const e = net.edges[id];
         if (!e.alive) continue;
         const width = Math.max(2, e.type.pavedHalf * 2 * s);
-        ctx.strokeStyle = pass === 0 ? '#0e1317' : e.type.id === 'M' ? '#c99a3a' : e.type.highway ? '#8b949b' : '#5d666d';
+        ctx.strokeStyle = pass === 0 ? '#090c0e' : e.type.id === 'M' ? '#d6a548' : e.type.highway ? '#9aa3aa' : e.type.local ? '#3e464d' : '#59626a';
         ctx.lineWidth = pass === 0 ? width + 2 * dpr : width;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
@@ -275,14 +278,23 @@ export class Minimap {
       for (const lot of lots) {
         const [px, py] = T(lot.x, lot.z);
         if (px < -20 || px > w + 20 || py < -20 || py > h + 20) continue;
-        ctx.fillStyle = lot.kind === 'fuel' ? '#3ac46a' : lot.kind === 'service' ? '#4b8dff' : lot.kind === 'company' ? '#7d8790' : '#a07d50';
-        ctx.fillRect(px - 4 * dpr, py - 4 * dpr, 8 * dpr, 8 * dpr);
+        ctx.fillStyle = lot.kind === 'fuel' ? '#2fbf62' : lot.kind === 'service' ? '#3d7dff' : lot.kind === 'company' ? '#6f7880' : '#a07d50';
+        ctx.strokeStyle = '#0b0d0f';
+        ctx.lineWidth = 2 * dpr;
+        ctx.beginPath();
+        ctx.arc(px, py, 5 * dpr, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(px, py, 1.6 * dpr, 0, Math.PI * 2);
+        ctx.fill();
       }
     }
     // route
     if (route) {
-      ctx.strokeStyle = '#ff5f3a';
-      ctx.lineWidth = 5 * dpr;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
       ctx.beginPath();
       let first = true;
       for (const p of route.pts) {
@@ -297,6 +309,11 @@ export class Minimap {
         else ctx.lineTo(px, py);
         first = false;
       }
+      ctx.strokeStyle = '#123e8f';
+      ctx.lineWidth = 8 * dpr;
+      ctx.stroke();
+      ctx.strokeStyle = '#3d8bff';
+      ctx.lineWidth = 5 * dpr;
       ctx.stroke();
     }
     if (target) {
@@ -311,10 +328,15 @@ export class Minimap {
       ctx.fill();
       ctx.stroke();
     }
-    // trailer and truck arrow
-    ctx.fillStyle = '#5fe0ff';
-    ctx.strokeStyle = '#0a1014';
-    ctx.lineWidth = 2 * dpr;
+    // the truck: white arrow with a blue rim, as on a navigator
+    ctx.fillStyle = 'rgba(61,139,255,0.22)';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 16 * dpr, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#2a6fe0';
+    ctx.lineWidth = 2.5 * dpr;
+    ctx.lineJoin = 'round';
     ctx.beginPath();
     ctx.moveTo(cx, cy - 11 * dpr);
     ctx.lineTo(cx + 8 * dpr, cy + 8 * dpr);
