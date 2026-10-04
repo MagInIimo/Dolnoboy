@@ -76,10 +76,12 @@ export function* layoutYards(cb) {
       const u0 = best.u0;
       const u1 = best.u1;
       rect(u0, u1, vDrive - 2.9, vDrive + 2.9, L.ASPHALT, [0.95, 0.95, 0.95], 0.01);
+      // parking lane along the outer edge, a shade lighter (older asphalt)
+      rect(u0 + 1, u1 - 1, vDrive - 5.5, vDrive - 2.9, L.WORN, [1.0, 1.0, 1.0], 0.011);
       // parked cars along the outer edge (parallel), with gaps
       for (let u = u0 + 3; u < u1 - 2.5; u += 5.4 + r() * 0.6) {
         if (r() > 0.72) continue;
-        if (!clear(u, vDrive - 4.3, 0.6)) continue;
+        if (!clear(u, vDrive - 4.3, 0.6) || u < u0 + 1.5 || u > u1 - 1.5) continue;
         const [x, z] = W(u, vDrive - 4.1);
         yard.cars.push({ x, z, y: b.y, heading: b.heading + (r() < 0.5 ? Math.PI / 2 : -Math.PI / 2), kind: Math.floor(r() * r() * 4), color: PARKED_PAINT[Math.floor(r() * PARKED_PAINT.length)] });
       }

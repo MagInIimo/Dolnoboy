@@ -38,6 +38,29 @@ function entrances(gb, b, F_, count, y, side, attrs) {
   }
 }
 
+// Lived-in facades: air conditioner units and satellite dishes next to random windows on both long sides.
+function facadeClutter(gb, b, F_, base, floors, fh, bay, r, attrs, from = 1) {
+  const bays = Math.max(1, Math.round(b.w / bay));
+  const white = { ...attrs, aTint: [0.95, 0.95, 0.93] };
+  const grey = { ...attrs, aTint: [0.7, 0.72, 0.74] };
+  for (const side of [1, -1]) {
+    for (let i = 0; i < bays; i++) {
+      for (let f = from; f < floors; f++) {
+        const k = r();
+        if (k > 0.075) continue;
+        const u = -b.w / 2 + (i + 0.5) * bay + (r() < 0.5 ? -1 : 1) * bay * 0.32;
+        const y = base + f * fh + 0.55;
+        if (k < 0.055) localBox(gb, b, F_, u, y, side * (b.d / 2 + 0.17), 0.82, 0.56, 0.3, F.plasterWhite, white, 0.5);
+        else {
+          // dish on a short bracket
+          localBox(gb, b, F_, u, y + 0.6, side * (b.d / 2 + 0.12), 0.05, 0.05, 0.25, F.concrete, grey);
+          localCylinder(gb, b, F_, u, side * (b.d / 2 + 0.3), y + 0.35, 0.3, 0.3, 0.06, 10, F.plasterWhite, white);
+        }
+      }
+    }
+  }
+}
+
 function plinth(gb, b, F_, h, attrs) {
   prismWalls(gb, b, F_, 0, 0, b.w + 0.1, b.d + 0.1, b.y - 1.5, b.y + h, F.concrete, 3, 3, { ...attrs, aTint: DARK });
 }
@@ -66,6 +89,7 @@ const TYPES = {
     const bays = Math.round(b.w / 3.2);
     for (let i = 1; i < bays; i += 3) balconyColumn(gb, b, F_, -b.w / 2 + (i + 0.5) * 3.2, 1, 2.8, 0.95, b.y + 0.6 + fh, floors - 1, fh, a);
     entrances(gb, b, F_, Math.max(1, Math.round(b.w / 16)), b.y + 0.6, -1, a);
+    facadeClutter(gb, b, F_, b.y + 0.6, floors, fh, 3.2, r, a);
   },
   panel9(gb, b, r) {
     const F_ = frame(b);
@@ -90,6 +114,7 @@ const TYPES = {
       if (r() < 0.5) balconyColumn(gb, b, F_, u, -1, 3.0, 1.1, base + fh, floors - 1, fh, a);
     }
     if (!b.shop) entrances(gb, b, F_, sections, base, -1, a);
+    facadeClutter(gb, b, F_, base, floors, fh, 3.2, r, a, b.shop ? 2 : 1);
   },
   panelTower(gb, b, r) {
     const F_ = frame(b);
@@ -108,7 +133,7 @@ const TYPES = {
       balconyColumn(gb, b, F_, u, -1, 3.2, 1.2, base + fh, floors - 1, fh, a);
     }
     entrances(gb, b, F_, Math.max(1, Math.round(b.w / 26)), base, -1, a);
-    void r;
+    facadeClutter(gb, b, F_, base, floors, fh, 3.2, r, a);
   },
   stalinka(gb, b, r) {
     const F_ = frame(b);
