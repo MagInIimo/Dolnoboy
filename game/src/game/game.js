@@ -6,7 +6,7 @@ import { BuildingLayer, buildingMaterial, facadeArray, loadFacadeImages } from '
 import { TreeSystem } from '../render/trees.js';
 import { Truck } from '../vehicle/truck.js';
 import { loadTruckAsset } from '../vehicle/truck-glb.js';
-import { loadCarModels } from '../traffic/car-models.js';
+import { loadCarModels, loadTruckLineup } from '../traffic/car-models.js';
 import { loadLandmarkModels } from '../render/landmark-models.js';
 import { buildTrailer } from '../vehicle/trailer-model.js';
 import { CameraRig, Mirrors } from '../render/camera-rig.js';
@@ -54,7 +54,7 @@ export class Game {
     const engine = new Engine(this.frame, s.settings.quality);
     this.engine = engine;
     L.stage('loadingTextures', 0.35);
-    const [photos] = await Promise.all([loadPhotoTextures((p) => L.stage('loadingTextures', 0.35 + p * 0.15)), loadTruckAsset(s.truck.model), loadCarModels(), loadLandmarkModels(), loadFacadeImages().then((f) => (this.bakedFacades = f))]);
+    const [photos] = await Promise.all([loadPhotoTextures((p) => L.stage('loadingTextures', 0.35 + p * 0.15)), loadTruckAsset(s.truck.model), loadCarModels(), loadTruckLineup(), loadLandmarkModels(), loadFacadeImages().then((f) => (this.bakedFacades = f))]);
     const texSize = engine.quality.texture;
     this.surfaces = new SurfaceMaterials(buildSurfaceArrays(photos, texSize), macroNoiseTexture(), s.settings.quality);
     engine.attachSurfaces(this.surfaces);

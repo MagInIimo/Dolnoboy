@@ -3,7 +3,7 @@ import { GeoBuilder } from '../render/geo-builder.js';
 import { computeNodeInfo } from '../render/road-builder.js';
 import { signalPhase } from '../world/signals.js';
 import { SpatialHash, angleDiff, clamp, rng, wrapAngle } from '../core/util.js';
-import { carModels, vehicleMaterial } from './car-models.js';
+import { carModels, truckLineup, vehicleMaterial } from './car-models.js';
 
 // Vehicle kinds: size in metres, speed factor relative to the limit, spawn weight.
 const KINDS = {
@@ -18,6 +18,8 @@ const KINDS = {
 };
 // Tractor-trailer layout relative to the vehicle centre: tandem centre ahead of it, king pin, trailer axles.
 const SEMI = { tandem: 3.125, wheelbase: 4.6, kingpin: 0.35, trailerAxle: 7.3 };
+// How often each lineup tractor turns up on Russian roads (domestic and Chinese trucks are the most common).
+const SEMI_WEIGHT = { taiga: 3, buran: 2.5, neman: 1.5, polyus: 2, enisey: 2, sever: 1.2, atlant: 1, titan: 1, ladoga: 1, orion: 1, vektor: 0.8, vega: 0.8 };
 const TARP = [0x2f5d9e, 0x2f5d9e, 0xd8dcdd, 0xd8dcdd, 0x8a9096, 0x2e6b3f, 0xb3302a, 0xd9a31c, 0x1f3c6e, 0x5b6770];
 const TRUCK_PAINT = [0xe9ebe8, 0xe9ebe8, 0xc0352b, 0x1f4f99, 0xf0a020, 0x2e6b3f, 0xb7bcc0, 0x1a1c1f, 0xd8d0b8];
 const KIND_IDS = Object.keys(KINDS);
@@ -118,6 +120,9 @@ export class Traffic {
       this.meshes[kind] = { lo: make(src?.lo ?? simpleGeometry(kind), cap, true), hi: src?.hi ? make(src.hi, nearCap, true) : null, spec: src?.spec ?? null };
       this.counts[kind] = { hi: 0, lo: 0 };
     }
+    // AI tractors from the player's lineup, one instanced mesh per model
+    this.semiVariants = (truckLineup() ?? []).map((v) => ({ id: v.id, spec: v.spec, mesh: make(v.geo, 12, true), n: 0, weight: SEMI_WEIGHT[v.id] ?? 1 }));
+    this.semiWeight = this.semiVariants.reduce((a, v) => a + v.weight, 0);
     // semi-trailers drawn behind the AI tractors
     this.trailerMeshes = {};
     for (const t of ['curtain', 'reefer']) {
@@ -263,6 +268,7 @@ export class Traffic {
       braking: false,
       color: kind === 'bus' ? BUS_PAINT[Math.floor(r() * BUS_PAINT.length)] : kind === 'police' ? 0xf2f3f1 : kind === 'semi' ? TRUCK_PAINT[Math.floor(r() * TRUCK_PAINT.length)] : PAINT[Math.floor(r() * PAINT.length)],
       trailer: kind === 'semi' ? (r() < 0.7 ? 'curtain' : 'reefer') : null,
+      variant: kind === 'semi' ? this.pickVariant(r()) : -1,
       tarp: TARP[Math.floor(r() * TARP.length)],
       collider: { x: 0, z: 0, w: spec.wid, d: spec.len, heading: 0, kind: 'car', h: 1.8 },
       box: null,
@@ -979,6 +985,15 @@ export class Traffic {
     return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t };
   }
 
+  pickVariant(x) {
+    let w = x * this.semiWeight;
+    for (let i = 0; i < this.semiVariants.length; i++) {
+      w -= this.semiVariants[i].weight;
+      if (w <= 0) return i;
+    }
+    return this.semiVariants.length - 1;
+  }
+
   placeWheels(car, spec, base) {
     const W = this.wheels[spec.wheel];
     if (!W) return;
@@ -1019,18 +1034,22 @@ export class Traffic {
       const C = this.counts[car.kind];
       const dx = car.x - camPos.x;
       const dz = car.z - camPos.z;
-      const hi = !!M.hi && dx * dx + dz * dz < near2 && C.hi < M.hi.instanceMatrix.count;
-      const mesh = hi ? M.hi : M.lo;
-      const i = hi ? C.hi++ : C.lo++;
+      const V = car.variant >= 0 ? this.semiVariants[car.variant] : null;
+      const lineupMesh = V && V.n < V.mesh.instanceMatrix.count;
+      const hi = !lineupMesh && !!M.hi && dx * dx + dz * dz < near2 && C.hi < M.hi.instanceMatrix.count;
+      const mesh = lineupMesh ? V.mesh : hi ? M.hi : M.lo;
+      const i = lineupMesh ? V.n++ : hi ? C.hi++ : C.lo++;
       // articulated trucks: the tractor follows the route ahead of the centre, the trailer trails behind it
       const semi = car.kind === 'semi' && this.trailerMeshes[car.trailer];
+      const wheelbase = lineupMesh ? V.spec.wheelbase : SEMI.wheelbase;
+      const kingpin = lineupMesh ? V.spec.kingpin : SEMI.kingpin;
       let x = car.x;
       let y = car.y;
       let z = car.z;
       let yaw = car.yaw;
       if (semi) {
         const a = this.routePoint(car, SEMI.tandem);
-        const f = this.routePoint(car, SEMI.tandem + SEMI.wheelbase);
+        const f = this.routePoint(car, SEMI.tandem + wheelbase);
         x = a.x;
         y = a.y;
         z = a.z;
@@ -1059,8 +1078,8 @@ export class Traffic {
       if (hi) this.placeWheels(car, M.spec, m);
       if (semi) {
         this.addShadow(shadowCount++, x + Math.sin(yaw) * 2.2, y, z + Math.cos(yaw) * 2.2, yaw, 2.9, 8.2);
-        const kx = x + Math.sin(yaw) * SEMI.kingpin;
-        const kz = z + Math.cos(yaw) * SEMI.kingpin;
+        const kx = x + Math.sin(yaw) * kingpin;
+        const kz = z + Math.cos(yaw) * kingpin;
         let T = car.trail;
         let ddx = T ? kx - T.x : 0;
         let ddz = T ? kz - T.z : 0;
@@ -1075,7 +1094,7 @@ export class Traffic {
         T.z = kz - (ddz / l) * SEMI.trailerAxle;
         const tyaw = Math.atan2(ddx, ddz);
         const TM = this.trailerMeshes[car.trailer];
-        const thi = hi && TM.hiN < TM.hi.instanceMatrix.count;
+        const thi = dx * dx + dz * dz < near2 && TM.hiN < TM.hi.instanceMatrix.count;
         const tmesh = thi ? TM.hi : TM.lo;
         const ti = thi ? TM.hiN++ : TM.loN++;
         this.quat.setFromAxisAngle(this.axisY, tyaw);
@@ -1102,6 +1121,17 @@ export class Traffic {
         mesh.geometry.attributes.aLamp.needsUpdate = true;
         mesh.geometry.attributes.aBeacon.needsUpdate = true;
       }
+    }
+    for (const V of this.semiVariants) {
+      const mesh = V.mesh;
+      mesh.count = V.n;
+      mesh.visible = V.n > 0;
+      if (V.n) {
+        mesh.instanceMatrix.needsUpdate = true;
+        mesh.instanceColor.needsUpdate = true;
+        mesh.geometry.attributes.aLamp.needsUpdate = true;
+      }
+      V.n = 0;
     }
     for (const T of Object.values(this.trailerMeshes)) {
       for (const [mesh, n] of [[T.hi, T.hiN], [T.lo, T.loN]]) {

@@ -1975,9 +1975,27 @@ def build_truck(tid, S, lod=False):
     cab_rear(d, S)
     chassis(d, S)
     mir = mirrors(d, S, eye)
+    lw = Buf()
+    if lod:
+        # traffic copies: simple wheels in the body (the traffic draws whole vehicles as instances)
+        d0 = d
+        d = lw
+        for sx in (1, -1):
+            for z, dual in [(S['wb'], False)] + ([(0.675, True), (-0.675, True)] if six else [(0.0, True)]):
+                tw = 0.3 if dual else 0.38
+                xs = [sx * (1.04 - tw / 2 - 0.015), sx * (1.04 - tw * 1.5 - 0.045)] if dual else [sx * (S['w'] - 0.06 - tw / 2 + 0.02)]
+                for k, xc in enumerate(xs):
+                    R = S['R']
+                    lathe(d, (xc, R, z), 'x', [(0.29, -tw / 2), (R - 0.03, -tw / 2), (R, -tw / 2 + 0.05), (R, tw / 2 - 0.05), (R - 0.03, tw / 2), (0.29, tw / 2)], 14, 'tyre', True)
+                    if k == 0:
+                        lathe(d, (xc, R, z), 'x', [(0.29, sx * tw / 2), (0.12, sx * (tw / 2 - 0.06)), (0.0, sx * (tw / 2 - 0.04))], 14, 'rim', True, ref=Vector((xc - sx, R, z)))
+                    lathe(d, (xc, R, z), 'x', [(0.29, -sx * tw / 2), (0.0, -sx * (tw / 2 - 0.05))], 10, 'rimdark', False, ref=Vector((xc + sx, R, z)))
+        d = d0
     parts.append(d.obj(tid + '_detail', sharp=0.7))
     body = join_objs(tid, parts)
     made.append(body)
+    if lod:
+        made.append(lw.obj(tid + '_lowheels', sharp=0.9))
     gauges = None
     if not lod:
         ib = Buf()
@@ -1993,7 +2011,7 @@ def build_truck(tid, S, lod=False):
     else:
         wheels += [('wheel_RL', 1, 0.0, True), ('wheel_RR', -1, 0.0, True)]
     wheel_list = []
-    for name, sx, z, dual in wheels:
+    for name, sx, z, dual in (wheels if not lod else []):
         tw = 0.3 if dual else 0.38
         xc = sx * (1.04 - (tw / 2 + 0.015 if dual else 0.0)) if dual else sx * (S['w'] - 0.06 - tw / 2 + 0.02)
         o = wheel_obj(name if not lod else tid + '_' + name, R, tw, 0.285, sx, S['style'].get('rims', 'alu'), dual)
@@ -2159,17 +2177,14 @@ if __name__ == '__main__':
             bpy.data.objects.remove(o)
         if LO:
             lo, _ = build_truck(tid, S, lod=True)
-            parts = [o for o in lo if not o.name.startswith(tid + '_wheel')]
-            for o in lo:
-                if o not in parts:
-                    bpy.data.objects.remove(o)
-            body = join_objs(tid, parts)
+            body = lo[0]
             dec = body.modifiers.new('dec', 'DECIMATE')
-            dec.ratio = min(1.0, 5000 / max(1, tris(body)))
+            dec.ratio = min(1.0, 4600 / max(1, tris(body)))
             dg = bpy.context.evaluated_depsgraph_get()
             me = bpy.data.meshes.new_from_object(body.evaluated_get(dg))
             body.modifiers.clear()
             body.data = me
+            body = join_objs(tid, lo)
             body['vehicle'] = json.dumps({'len': spec['length'], 'wid': 2.5, 'h': spec['top'], 'wheel': '', 'r': spec['R'], 'wheels': spec['wheels'],
                                           'beacon': 0, 'kingpin': spec['king'], 'front': spec['cabFront'], 'wheelbase': spec['wheelbase'], 'rear': spec['rear']})
             lo_objs.append(body)

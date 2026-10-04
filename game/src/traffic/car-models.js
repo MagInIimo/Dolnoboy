@@ -65,6 +65,29 @@ export async function loadCarModels(url = 'assets/models/cars.glb') {
 
 export const carModels = () => models;
 
+// Low-detail copies of the player's tractor lineup (tools/blender/tractors.py → assets/trucks/trucks-lo.glb)
+// for the AI articulated trucks. Each node carries its layout: wheelbase, fifth wheel (kingpin), front, rear.
+let lineup = null;
+
+export async function loadTruckLineup(url = 'assets/trucks/trucks-lo.glb') {
+  try {
+    const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url);
+    gltf.scene.updateMatrixWorld(true);
+    lineup = [];
+    for (const node of gltf.scene.children) {
+      const raw = node.userData?.vehicle;
+      if (!raw) continue;
+      lineup.push({ id: node.name, geo: mergeNode(node), spec: typeof raw === 'string' ? JSON.parse(raw) : raw });
+    }
+  } catch (e) {
+    console.warn('truck lineup for traffic unavailable', e);
+    lineup = null;
+  }
+  return !!lineup?.length;
+}
+
+export const truckLineup = () => lineup;
+
 export function mergeNode(node, roles = ROLES, prefix = /^car_/) {
   const parts = [];
   node.traverse((o) => {
