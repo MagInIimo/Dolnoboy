@@ -163,37 +163,67 @@ export class CameraRig {
   }
 }
 
-// Rear-view mirrors for the cab view: two small render targets mapped onto the mirror glass.
+// Rear-view mirrors for the cab view. Each side renders once from the driver's eye reflected in the main
+// mirror's plane; the main glass shows the middle of that image and the wide-angle glass below shows all of it.
+const MW = 320;
+const MH = 400;
+const v1 = new THREE.Vector3();
+const v2 = new THREE.Vector3();
+const v3 = new THREE.Vector3();
+
+function setUV(mesh, u0, u1, w0, w1) {
+  const g = mesh.geometry;
+  const src = g.userData.uvSource ?? (g.userData.uvSource = g.attributes.uv.clone());
+  const out = new Float32Array(src.count * 2);
+  for (let i = 0; i < src.count; i++) {
+    // the camera behind the glass sees the scene left-right reversed
+    out[i * 2] = 1 - (u0 + src.getX(i) * (u1 - u0));
+    // glTF texture coordinates run from the top; render targets from the bottom
+    out[i * 2 + 1] = w0 + (1 - src.getY(i)) * (w1 - w0);
+  }
+  g.setAttribute('uv', new THREE.BufferAttribute(out, 2));
+}
+
 export class Mirrors {
   constructor(engine, truck, every) {
     this.engine = engine;
     this.truck = truck;
     this.every = every;
     this.frame = 0;
-    this.targets = [new THREE.WebGLRenderTarget(256, 384), new THREE.WebGLRenderTarget(256, 384)];
-    for (const t of this.targets) t.texture.colorSpace = THREE.LinearSRGBColorSpace;
-    // short reach: what matters in a mirror is the road just behind; far objects are culled early
-    this.cams = [new THREE.PerspectiveCamera(26, 256 / 384, 0.5, 320), new THREE.PerspectiveCamera(26, 256 / 384, 0.5, 320)];
-    this.mats = this.targets.map((t) => new THREE.MeshBasicMaterial({ map: t.texture, side: THREE.DoubleSide }));
-    for (const m of this.mats) m.map.wrapS = THREE.RepeatWrapping;
-    for (const m of this.mats) {
-      m.map.repeat.x = -1;
-      m.map.offset.x = 1;
-    }
+    this.targets = [new THREE.WebGLRenderTarget(MW, MH), new THREE.WebGLRenderTarget(MW, MH)];
+    this.cams = [new THREE.PerspectiveCamera(46, MW / MH, 0.4, 420), new THREE.PerspectiveCamera(46, MW / MH, 0.4, 420)];
+    this.mats = this.targets.map((t) => new THREE.MeshBasicMaterial({ map: t.texture }));
     this.attached = null;
   }
 
   attach(model) {
     this.attached = model;
-    this.originals = [model.mirrorL?.material, model.mirrorR?.material];
+    this.sides = model.lineup
+      ? [
+          { main: model.mirrorL, wide: model.mirrorWL },
+          { main: model.mirrorR, wide: model.mirrorWR },
+        ]
+      : [{ main: model.mirrorL }, { main: model.mirrorR }];
+    for (const sd of this.sides) {
+      sd.originals = [sd.main?.material, sd.wide?.material];
+      if (model.lineup) {
+        if (sd.main) setUV(sd.main, 0.2, 0.8, 0.3, 0.95);
+        if (sd.wide) setUV(sd.wide, 0, 1, 0, 1);
+      }
+    }
+    if (!model.lineup) for (const m of this.mats) m.map.repeat.set(-1, 1), m.map.offset.set(1, 0), (m.map.wrapS = THREE.RepeatWrapping);
+    this.active = false;
   }
 
   setActive(active) {
-    const m = this.attached;
-    if (!m) return;
+    if (!this.attached) return;
     if (active && !this.active) this.frame = 0;
-    if (m.mirrorL) m.mirrorL.material = active ? this.mats[0] : this.originals[0];
-    if (m.mirrorR) m.mirrorR.material = active ? this.mats[1] : this.originals[1];
+    if (active !== this.active) {
+      this.sides.forEach((sd, i) => {
+        if (sd.main) sd.main.material = active ? this.mats[i] : sd.originals[0];
+        if (sd.wide) sd.wide.material = active ? this.mats[i] : sd.originals[1];
+      });
+    }
     this.active = active;
   }
 
@@ -204,27 +234,54 @@ export class Mirrors {
     if ((this.frame - 1) % this.every) return;
     const r = this.engine.renderer;
     const scene = this.engine.scene;
-    const p = this.truck.physics;
     const m = this.attached;
     const prev = r.getRenderTarget();
-    [m.mirrorL, m.mirrorR].forEach((mesh, i) => {
+    const shadows = r.shadowMap.autoUpdate;
+    r.shadowMap.autoUpdate = false;
+    const interior = m.interiorNode;
+    if (interior) interior.visible = false;
+    this.sides.forEach((sd, i) => {
+      const mesh = sd.main;
       if (!mesh) return;
       const cam = this.cams[i];
-      // the glass may be offset inside its mesh: use the centre of its geometry
-      if (!mesh.userData.centre) {
-        mesh.geometry.computeBoundingBox();
-        mesh.userData.centre = mesh.geometry.boundingBox.getCenter(new THREE.Vector3());
+      const info = mesh.userData.mirror;
+      if (info && m.lineup) {
+        // reflect the eye in the mirror plane and look through the glass centre
+        const frame = m.body;
+        frame.updateMatrixWorld(true);
+        const c = v1.fromArray(info.centre).applyMatrix4(frame.matrixWorld);
+        const n = v2.fromArray(info.normal).transformDirection(frame.matrixWorld);
+        const d = v3.copy(m.eye).applyMatrix4(frame.matrixWorld).sub(c).dot(n);
+        cam.position.copy(m.eye).applyMatrix4(frame.matrixWorld).addScaledVector(n, -2 * d);
+        cam.up.fromArray(info.up).transformDirection(frame.matrixWorld);
+        cam.lookAt(c);
+        // the camera sits behind the glass: clip everything up to just past it (the mirror's own housing)
+        const near = cam.position.distanceTo(c) + 0.12;
+        if (Math.abs(cam.near - near) > 0.01) {
+          cam.near = near;
+          cam.updateProjectionMatrix();
+        }
+      } else {
+        if (!mesh.userData.centre) {
+          mesh.geometry.computeBoundingBox();
+          mesh.userData.centre = mesh.geometry.boundingBox.getCenter(new THREE.Vector3());
+        }
+        cam.position.copy(mesh.userData.centre);
+        mesh.localToWorld(cam.position);
+        const p = this.truck.physics;
+        const back = p.yaw + Math.PI + (i === 0 ? 0.06 : -0.06);
+        cam.up.set(0, 1, 0);
+        cam.lookAt(cam.position.x + Math.sin(back) * 10, cam.position.y - 0.9, cam.position.z + Math.cos(back) * 10);
       }
-      cam.position.copy(mesh.userData.centre);
-      mesh.localToWorld(cam.position);
-      const side = i === 0 ? -1 : 1;
-      const back = p.yaw + Math.PI + side * -0.06;
-      cam.lookAt(cam.position.x + Math.sin(back) * 10, cam.position.y - 0.9, cam.position.z + Math.cos(back) * 10);
       mesh.visible = false;
+      if (sd.wide) sd.wide.visible = false;
       r.setRenderTarget(this.targets[i]);
       r.render(scene, cam);
       mesh.visible = true;
+      if (sd.wide) sd.wide.visible = true;
     });
+    if (interior) interior.visible = true;
+    r.shadowMap.autoUpdate = shadows;
     r.setRenderTarget(prev);
   }
 }

@@ -5,7 +5,7 @@ import { WorldView } from '../render/world-view.js';
 import { BuildingLayer, buildingMaterial, facadeArray, loadFacadeImages } from '../render/building-layer.js';
 import { TreeSystem } from '../render/trees.js';
 import { Truck } from '../vehicle/truck.js';
-import { loadTractorAsset } from '../vehicle/truck-glb.js';
+import { loadTruckAsset } from '../vehicle/truck-glb.js';
 import { loadCarModels } from '../traffic/car-models.js';
 import { loadLandmarkModels } from '../render/landmark-models.js';
 import { buildTrailer } from '../vehicle/trailer-model.js';
@@ -54,7 +54,7 @@ export class Game {
     const engine = new Engine(this.frame, s.settings.quality);
     this.engine = engine;
     L.stage('loadingTextures', 0.35);
-    const [photos] = await Promise.all([loadPhotoTextures((p) => L.stage('loadingTextures', 0.35 + p * 0.15)), loadTractorAsset(), loadCarModels(), loadLandmarkModels(), loadFacadeImages().then((f) => (this.bakedFacades = f))]);
+    const [photos] = await Promise.all([loadPhotoTextures((p) => L.stage('loadingTextures', 0.35 + p * 0.15)), loadTruckAsset(s.truck.model), loadCarModels(), loadLandmarkModels(), loadFacadeImages().then((f) => (this.bakedFacades = f))]);
     const texSize = engine.quality.texture;
     this.surfaces = new SurfaceMaterials(buildSurfaceArrays(photos, texSize), macroNoiseTexture(), s.settings.quality);
     engine.attachSurfaces(this.surfaces);
@@ -370,9 +370,11 @@ export class Game {
     const v = this.debugView;
     const cam = this.engine.camera;
     const car = v.car;
-    const tx = car ? car.x : v.x;
+    // fwd: target moved along the car's heading (e.g. to the cab front of a tractor)
+    const f = v.fwd ?? 0;
+    const tx = (car ? car.x + Math.sin(car.yaw) * f : v.x);
     const ty = (car ? car.y : v.y) + (v.ty ?? 0.8);
-    const tz = car ? car.z : v.z;
+    const tz = (car ? car.z + Math.cos(car.yaw) * f : v.z);
     const yaw = (car ? car.yaw : 0) + (v.yaw ?? 0.6);
     cam.position.set(tx + Math.sin(yaw) * (v.dist ?? 7), ty + (v.h ?? 0.8), tz + Math.cos(yaw) * (v.dist ?? 7));
     cam.lookAt(tx, ty, tz);
@@ -611,12 +613,14 @@ export class Game {
       }
       case 'truck': {
         const tr = TRUCKS[v];
+        if (!tr) break;
         if (!s.truck.owned.includes(v)) {
           if (s.money < tr.price) break;
           s.money -= tr.price;
           s.truck.owned.push(v);
         }
         s.truck.model = v;
+        await loadTruckAsset(v);
         this.refitTruck();
         this.menus.render();
         break;
@@ -1095,7 +1099,8 @@ export class Game {
     }
     if (!this.hidden) {
       const night = this.engine.env.nightFactor;
-      this.truck.update(dt, night, this.rig.mode === 'cab');
+      const mins = Math.floor(s.time % 1440);
+      this.truck.update(dt, night, this.rig.mode === 'cab', { clock: `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`, odo: s.stats.km });
       this.rig.update(dt);
       if (this.debugView) this.applyDebugView();
       const focus = this.focusVec ?? (this.focusVec = new THREE.Vector3());

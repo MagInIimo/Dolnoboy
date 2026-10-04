@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { buildTractor, drawGauges, vehicleMaterials } from './truck-model.js';
-import { buildTractorGlb, hasTractorAsset } from './truck-glb.js';
+import { buildTruckModel, hasTruckAsset } from './truck-glb.js';
+import { drawCluster } from './cluster.js';
 import { buildTrailer } from './trailer-model.js';
 import { TruckPhysics } from './physics.js';
-import { TRAILERS, CARGO, COMPANIES, TRUCKS, PAINTS } from '../data/economy.js';
+import { TRAILERS, CARGO, COMPANIES, TRUCKS, PAINTS, STARTER_TRUCK } from '../data/economy.js';
 
 // Visual + physical truck with optional semi-trailer.
 export class Truck {
@@ -41,11 +42,21 @@ export class Truck {
   }
 
   setTruck(id, paintId, upgrades = {}) {
-    if (this.model) this.group.remove(this.model.root);
-    const spec = TRUCKS[id] ?? TRUCKS.sokol;
+    if (this.model) {
+      this.group.remove(this.model.root);
+      if (this.model.lineup) {
+        // geometry is shared with the loaded template; materials and the cluster texture are ours
+        const seen = new Set();
+        this.model.root.traverse((o) => o.isMesh && (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => seen.add(m)));
+        for (const m of seen) m.dispose();
+        this.model.interior.gaugeTex.dispose();
+      }
+    }
+    if (!TRUCKS[id]) id = STARTER_TRUCK;
+    const spec = TRUCKS[id];
     const paint = PAINTS.find((p) => p.id === paintId) ?? PAINTS[0];
     const look = { cab: spec.cab, color: new THREE.Color(paint.color).getHex(), lightBar: (upgrades.lights ?? 0) > 0 };
-    this.model = hasTractorAsset() ? buildTractorGlb(look) : buildTractor(look);
+    this.model = hasTruckAsset(id) ? buildTruckModel(id, look) : buildTractor(look);
     this.windowsInside = null;
     this.group.add(this.model.root);
     this.model.root.traverse((o) => {
@@ -57,12 +68,14 @@ export class Truck {
     p.tank = [600, 900, 1200][upgrades.tank ?? 0];
     p.gripBonus = [0, 0.08, 0.16][upgrades.tyres ?? 0];
     this.spec = spec;
-    if (this.model.glb) {
+    if (this.model.lineup) {
       p.wheelbase = this.model.wheelbase;
-      p.cabLength = 7.3;
-      p.cabCentre = 2.1;
+      p.hitch = this.model.hitchZ;
+      p.cabLength = this.model.length;
+      p.cabCentre = (this.model.cabFront + this.model.rear) / 2;
     } else {
       p.wheelbase = 3.8;
+      p.hitch = 0.35;
       p.cabLength = 7.2;
       p.cabCentre = 1.6;
     }
@@ -100,7 +113,7 @@ export class Truck {
     this.physics.cargoMass = 0;
   }
 
-  update(dt, nightFactor, interiorView) {
+  update(dt, nightFactor, interiorView, info = {}) {
     const p = this.physics;
     const m = this.model;
     if (!m) return;
@@ -113,10 +126,11 @@ export class Truck {
     this.group.rotation.z = p.roll + p.bumpRoll;
     m.body.rotation.x = -clampAbs(p.accel * 0.006, 0.03);
     m.body.rotation.z = clampAbs(p.latAccel * 0.006, 0.035);
-    if (m.glb) {
-      for (const w of m.wheels) for (const c of w.children) c.rotation.x = p.wheelSpin;
+    if (m.lineup) {
+      for (const w of m.wheels) w.rotation.x = p.wheelSpin;
       for (const w of m.frontWheels) w.rotation.y = p.steerAngle;
-      if (m.steering) m.steering.quaternion.copy(m.steeringBase).multiply(this.steerTurn.setFromAxisAngle(this.zAxis, -p.steerAngle * 9));
+      if (m.steering) m.steering.quaternion.setFromAxisAngle(m.steerAxis, p.steerAngle * 9);
+      if (m.interiorNode) m.interiorNode.visible = interiorView || !!info.showInterior;
     } else {
       for (const w of m.wheels) w.children.forEach((c) => (c.rotation.x = (w.position.x < 0 ? -1 : 1) * p.wheelSpin));
       for (const w of m.frontWheels) w.rotation.y = (w.position.x < 0 ? Math.PI : 0) + p.steerAngle;
@@ -132,15 +146,34 @@ export class Truck {
       if (m.interior.wheel) m.interior.wheel.rotation.z = -p.steerAngle * 9;
       this.gaugeTimer = (this.gaugeTimer ?? 0) - dt;
       if (interiorView && this.gaugeTimer <= 0) {
-        this.gaugeTimer = 0.08;
-        drawGauges(m.interior, Math.abs(p.v) * 3.6, p.rpm, p.fuel / p.tank, this.lightsOn);
+        this.gaugeTimer = 0.1;
+        if (m.interior.cluster) {
+          const blinkOn = this.blink % 0.8 < 0.42;
+          drawCluster(m.interior, {
+            speed: Math.abs(p.v) * 3.6,
+            rpm: p.rpm,
+            fuel: p.fuel / p.tank,
+            range: Math.max(0, Math.round((p.fuel / 32) * 100)),
+            gear: p.gear < 0 ? 'R' : p.gear === 0 ? 'N' : 'A' + p.gear,
+            clock: info.clock ?? '',
+            odo: info.odo ?? 0,
+            cruise: p.cruise ? p.cruise * 3.6 : 0,
+            retarder: p.retarder,
+            left: (this.indicator < 0 || this.hazard) && blinkOn,
+            right: (this.indicator > 0 || this.hazard) && blinkOn,
+            high: this.lightsOn && this.highBeam,
+            lights: this.lightsOn,
+            parking: p.parking,
+            damage: (p.damage ?? 0) > 0.3,
+          });
+        } else drawGauges(m.interior, Math.abs(p.v) * 3.6, p.rpm, p.fuel / p.tank, this.lightsOn);
       }
     }
     // trailer follows the hitch
     if (this.trailerModel) {
       const hp = p.hitchPos();
       const t = this.trailerModel.root;
-      t.position.set(hp.x, p.y + Math.sin(p.pitch) * 0.35, hp.z);
+      t.position.set(hp.x, p.y + Math.sin(p.pitch) * p.hitch, hp.z);
       t.rotation.order = 'YXZ';
       t.rotation.y = p.trailerYaw;
       t.rotation.x = -p.trailerPitch;
@@ -163,6 +196,7 @@ export class Truck {
       set(m.lamps.tail, p.braking > 0.1 ? 3.2 : on ? 1.2 : 0.1);
       set(m.lamps.reverse, p.direction < 0 ? 2.4 : 0);
       set(m.lamps.marker, on ? 1.4 : 0);
+      if (m.lamps.drl) set(m.lamps.drl, p.engineOn ? (on ? 1.2 : 2.2) : 0);
     } else {
       this.mats.indicator.emissiveIntensity = left ? 2.4 : 0;
       this.mats.indicatorR.emissiveIntensity = right ? 2.4 : 0;

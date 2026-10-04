@@ -138,11 +138,25 @@ export function companiesFor(city) {
   return list.slice(0, max);
 }
 
+// Tractor lineup: fictional names; each model recalls the shape of a real truck class, without logos.
+// axles: '4x2' or '6x4'; power in hp, torque in N·m; price in roubles.
 export const TRUCKS = {
-  sokol: { ru: '«Сокол» 440', en: 'Sokol 440', price: 0, power: 440, torque: 2200, cab: 'sokol' },
-  buran: { ru: '«Буран» 520', en: 'Buran 520', price: 420000, power: 520, torque: 2550, cab: 'buran' },
-  atlant: { ru: '«Атлант» 650', en: 'Atlant 650', price: 860000, power: 650, torque: 3100, cab: 'atlant' },
+  taiga: { ru: 'Тайга 5490', en: 'Taiga 5490', price: 0, power: 401, torque: 1900, axles: '4x2', cab: 'taiga', origin: 'ru' },
+  neman: { ru: 'Неман 544', en: 'Neman 544', price: 240000, power: 412, torque: 1950, axles: '4x2', cab: 'neman', origin: 'by' },
+  polyus: { ru: 'Полюс X3', en: 'Polyus X3', price: 330000, power: 430, torque: 2100, axles: '6x4', cab: 'polyus', origin: 'cn' },
+  enisey: { ru: 'Енисей C7', en: 'Enisey C7', price: 410000, power: 440, torque: 2100, axles: '6x4', cab: 'enisey', origin: 'cn' },
+  buran: { ru: 'Буран К5', en: 'Buran K5', price: 500000, power: 450, torque: 2200, axles: '6x4', cab: 'buran', origin: 'ru' },
+  vega: { ru: 'Вега SW', en: 'Vega SW', price: 620000, power: 490, torque: 2300, axles: '4x2', cab: 'vega', origin: 'it' },
+  vektor: { ru: 'Вектор T', en: 'Vektor T', price: 680000, power: 520, torque: 2550, axles: '4x2', cab: 'vektor', origin: 'fr' },
+  titan: { ru: 'Титан TG', en: 'Titan TG', price: 750000, power: 510, torque: 2600, axles: '4x2', cab: 'titan', origin: 'de' },
+  ladoga: { ru: 'Ладога XF', en: 'Ladoga XF', price: 800000, power: 530, torque: 2600, axles: '4x2', cab: 'ladoga', origin: 'nl' },
+  orion: { ru: 'Орион AC', en: 'Orion AC', price: 900000, power: 530, torque: 2600, axles: '6x4', cab: 'orion', origin: 'de' },
+  sever: { ru: 'Северянин R', en: 'Severyanin R', price: 1050000, power: 540, torque: 2800, axles: '4x2', cab: 'sever', origin: 'se' },
+  atlant: { ru: 'Атлант FX', en: 'Atlant FX', price: 1500000, power: 750, torque: 3550, axles: '6x4', cab: 'atlant', origin: 'se' },
 };
+export const STARTER_TRUCK = 'taiga';
+// ids of the first release's trucks mapped onto the lineup
+export const OLD_TRUCKS = { sokol: 'taiga' };
 
 export const UPGRADES = {
   engine: { ru: 'Чип-тюнинг двигателя', en: 'Engine tune', steps: [0, 35000, 80000, 140000], bonus: [0, 0.07, 0.14, 0.22] },

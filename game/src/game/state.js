@@ -1,3 +1,5 @@
+import { TRUCKS, STARTER_TRUCK, OLD_TRUCKS } from '../data/economy.js';
+
 export const SAVE_KEY = 'dalnoboy-rossii-save-v2';
 
 export function freshState(lang = 'ru') {
@@ -9,7 +11,7 @@ export function freshState(lang = 'ru') {
     time: 9 * 60,
     day: 1,
     stats: { deliveries: 0, km: 0, earned: 0, fines: 0, perfectParks: 0 },
-    truck: { model: 'sokol', paint: 'white', upgrades: { engine: 0, brakes: 0, tank: 0, tyres: 0, lights: 0 }, owned: ['sokol'], paints: ['white'] },
+    truck: { model: STARTER_TRUCK, paint: 'white', upgrades: { engine: 0, brakes: 0, tank: 0, tyres: 0, lights: 0 }, owned: [STARTER_TRUCK], paints: ['white'] },
     pos: null,
     fuel: 600,
     damage: 0,
@@ -41,7 +43,12 @@ export function sanitize(raw, lang = 'ru') {
   s.stats = { ...base.stats, ...(raw.stats ?? {}) };
   s.truck = { ...base.truck, ...(raw.truck ?? {}) };
   s.truck.upgrades = { ...base.truck.upgrades, ...(raw.truck?.upgrades ?? {}) };
-  if (!Array.isArray(s.truck.owned)) s.truck.owned = ['sokol'];
+  if (!Array.isArray(s.truck.owned)) s.truck.owned = [STARTER_TRUCK];
+  // trucks of the first release map onto the lineup; unknown ids are dropped
+  const known = (id) => (TRUCKS[id] ? id : OLD_TRUCKS[id] ?? null);
+  s.truck.owned = [...new Set([STARTER_TRUCK, ...s.truck.owned.map(known).filter(Boolean)])];
+  s.truck.model = known(s.truck.model) ?? STARTER_TRUCK;
+  if (!s.truck.owned.includes(s.truck.model)) s.truck.owned.push(s.truck.model);
   if (!Array.isArray(s.truck.paints)) s.truck.paints = ['white'];
   s.settings = { ...base.settings, ...(raw.settings ?? {}) };
   if (!Array.isArray(s.visited)) s.visited = [];

@@ -9,7 +9,6 @@ const G = 9.81;
 const IDLE = 620;
 const MAX_RPM = 2150;
 const WHEELBASE = 3.8;
-const HITCH = 0.35;
 const TRACTOR_MASS = 8200;
 const LIMITER = 90 / 3.6;
 
@@ -102,6 +101,7 @@ export class TruckPhysics {
     this.wheelbase = WHEELBASE;
     this.cabLength = 7.2;
     this.cabCentre = 1.6;
+    this.hitch = 0.35;
   }
 
   get mass() {
@@ -121,7 +121,7 @@ export class TruckPhysics {
   }
 
   hitchPos() {
-    return { x: this.x + Math.sin(this.yaw) * HITCH, z: this.z + Math.cos(this.yaw) * HITCH };
+    return { x: this.x + Math.sin(this.yaw) * this.hitch, z: this.z + Math.cos(this.yaw) * this.hitch };
   }
 
   trailerAxle() {
@@ -352,7 +352,7 @@ export class TruckPhysics {
     this.yaw = wrapAngle(this.yaw + yawRate * dt);
     // trailer: no lateral velocity at the trailer axle
     if (this.trailer) {
-      const hv = { x: this.v * fx - HITCH * yawRate * rx, z: this.v * fz - HITCH * yawRate * rz };
+      const hv = { x: this.v * fx - this.hitch * yawRate * rx, z: this.v * fz - this.hitch * yawRate * rz };
       const trx = -Math.cos(this.trailerYaw);
       const trz = Math.sin(this.trailerYaw);
       const tRate = -(hv.x * trx + hv.z * trz) / this.trailer.axle;
