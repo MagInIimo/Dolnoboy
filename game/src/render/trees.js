@@ -134,22 +134,50 @@ function speciesModel(species, r) {
       gb.idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
     }
   };
-  // a ball-ish crown of cards around (0, y, 0) with radius rad
-  const ball = (y, rad, count, size, cell, cell2 = cell) => {
-    crown = [0, y, 0];
+  // crown filling an ellipsoid (rx across, ry up) around (ox, y, oz), cards denser toward the surface
+  const crownE = (y, rx, ry, count, size, cell, cell2 = cell, ox = 0, oz = 0) => {
+    crown = [ox, y, oz];
     for (let i = 0; i < count; i++) {
       const a = r() * Math.PI * 2;
-      const e = (r() - 0.35) * 1.4;
-      const d = rad * (0.35 + Math.sqrt(r()) * 0.65);
-      const cy = y + Math.sin(e) * d * 0.8;
-      card(Math.sin(a) * Math.cos(e) * d, cy, Math.cos(a) * Math.cos(e) * d, size * (0.85 + r() * 0.35), size * (0.85 + r() * 0.35), r() * Math.PI, (r() - 0.5) * 0.9, i % 3 ? cell : cell2, 0.72 + ((cy - y + rad) / (2 * rad)) * 0.36);
+      const v = r() * 2 - 1;
+      const h = Math.sqrt(1 - v * v);
+      const d = 0.45 + Math.sqrt(r()) * 0.55;
+      const cx = ox + Math.sin(a) * h * rx * d;
+      const cz = oz + Math.cos(a) * h * rx * d;
+      const cy = y + v * ry * d;
+      const k = size * (0.8 + r() * 0.4);
+      card(cx, cy, cz, k, k, r() * Math.PI, (r() - 0.5) * 1.0, i % 3 ? cell : cell2, 0.7 + ((v + 1) / 2) * 0.38);
+    }
+  };
+  const limb = (y0, len, a, rise, rad, bark = 'generic') => {
+    // a bough from the trunk into the crown (visible through gaps in the foliage)
+    const uv = barkUV(bark);
+    const n = 5;
+    const base = gb.count;
+    const dx = Math.sin(a);
+    const dz = Math.cos(a);
+    for (let i = 0; i <= n; i++) {
+      const t = (i / n) * Math.PI * 2;
+      const ox = Math.cos(t);
+      const oy = Math.sin(t);
+      // ring perpendicular to the bough direction (roughly)
+      const px = -dz * ox;
+      const pz = dx * ox;
+      gb.vertex(px * rad, y0 + oy * rad, pz * rad, px, oy, pz, uv.u0 + (i / n) * 0.3, uv.v0, { aShade: 0.7 });
+      gb.vertex(dx * len + px * rad * 0.4, y0 + rise + oy * rad * 0.4, dz * len + pz * rad * 0.4, px, oy, pz, uv.u0 + (i / n) * 0.3, uv.v1, { aShade: 0.85 });
+    }
+    for (let i = 0; i < n; i++) {
+      const q = base + i * 2;
+      gb.idx.push(q, q + 2, q + 1, q + 1, q + 2, q + 3);
     }
   };
   switch (species) {
     case 'birch': {
-      trunk(13, 0.2, 0.07, 'birch');
-      ball(9.5, 3.2, 26, 3.0, 'birch');
-      ball(12.2, 1.8, 8, 2.4, 'birch');
+      // tall white trunk, crown from a third of the height, slightly weeping
+      trunk(15, 0.22, 0.05, 'birch');
+      for (let i = 0; i < 4; i++) limb(6 + i * 1.6, 1.8, i * 1.9, 1.6, 0.06, 'birch');
+      crownE(9.6, 2.7, 4.6, 40, 2.6, 'birch');
+      crownE(13.6, 1.5, 1.6, 10, 2.2, 'birch');
       break;
     }
     case 'spruce': {
@@ -171,31 +199,37 @@ function speciesModel(species, r) {
       break;
     }
     case 'pine': {
-      trunk(17, 0.32, 0.12, 'pine');
-      ball(14.5, 3.0, 22, 3.2, 'pine');
-      ball(12.2, 2.2, 8, 2.6, 'pine');
+      // Scots pine: straight orange trunk, irregular flat-topped crown on the upper third
+      trunk(18, 0.32, 0.1, 'pine');
+      for (let i = 0; i < 5; i++) limb(10.5 + i * 1.3, 2.2, i * 2.4, 0.9, 0.08, 'pine');
+      crownE(15.2, 3.4, 1.9, 22, 3.0, 'pine');
+      crownE(13.0, 2.6, 1.6, 14, 2.8, 'pine', 'pine', 1.2, -0.5);
+      crownE(11.4, 2.0, 1.3, 9, 2.6, 'pine', 'pine', -1.3, 0.6);
       break;
     }
     case 'oak':
     case 'linden':
     case 'maple': {
-      trunk(species === 'linden' ? 8 : 6, 0.4, 0.18, 'generic');
-      ball(species === 'linden' ? 8.5 : 7.5, 4.0, 34, 3.6, 'broad', species === 'maple' ? 'bush' : 'broad2');
-      ball(species === 'linden' ? 11.2 : 10, 2.4, 10, 3.0, 'broad');
+      const tall = species === 'linden';
+      trunk(tall ? 9 : 7, 0.45, 0.2, 'generic');
+      for (let i = 0; i < 5; i++) limb(tall ? 4.5 : 3.6, tall ? 3.2 : 3.8, i * 1.26 + 0.3, tall ? 3.0 : 2.4, 0.16);
+      crownE(tall ? 9.5 : 8.0, tall ? 4.3 : 5.0, tall ? 5.0 : 3.8, 48, 3.5, 'broad', species === 'maple' ? 'bush' : 'broad2');
+      crownE(tall ? 13.2 : 11.0, tall ? 2.6 : 3.2, 2.0, 12, 3.0, 'broad');
       break;
     }
     case 'poplar': {
-      trunk(16, 0.32, 0.1, 'generic');
-      for (let i = 0; i < 9; i++) ball(4 + i * 1.4, 1.5 - i * 0.05, 4, 2.6, 'broad2', 'broad');
+      trunk(18, 0.34, 0.1, 'generic');
+      crownE(11.0, 2.3, 7.5, 44, 2.6, 'broad2', 'broad');
       break;
     }
     case 'apple': {
-      trunk(2.6, 0.17, 0.1, 'generic');
-      ball(3.6, 2.0, 14, 2.2, 'apple');
+      trunk(2.2, 0.17, 0.1, 'generic');
+      for (let i = 0; i < 4; i++) limb(1.6, 1.4, i * 1.6, 1.0, 0.06);
+      crownE(3.5, 2.4, 1.7, 18, 2.0, 'apple');
       break;
     }
     default: {
-      ball(1.0, 1.1, 9, 1.9, 'bush', 'broad2');
+      crownE(1.0, 1.4, 1.0, 10, 1.8, 'bush', 'broad2');
     }
   }
   return gb;
@@ -399,6 +433,41 @@ export class TreeSystem {
         else species = k < 0.36 ? 'birch' : k < 0.58 ? 'spruce' : k < 0.75 ? 'pine' : k < 0.9 ? 'oak' : 'linden';
         if (f < 0.58 && r() < 0.35) species = 'bush';
         list.push({ x, y, z, s: SPECIES_INDEX[species], scale: 0.75 + r() * 0.55, rot: r() * Math.PI * 2 });
+      }
+    }
+    // forest edge along roads: the wall of trees a driver sees, denser than the forest behind it, with undergrowth
+    const probe = { road: Infinity };
+    const coarse = 16;
+    const edgeStep = 4.6 / Math.sqrt(this.density);
+    for (let ci = 0; ci < size / coarse; ci++) {
+      for (let cj = 0; cj < size / coarse; cj++) {
+        const cx = x0 + (ci + 0.5) * coarse;
+        const cz = z0 + (cj + 0.5) * coarse;
+        world.terrainHeight(cx, cz, probe);
+        if (probe.road > 95 || probe.road < 0) continue;
+        if (forestDensity(cx, cz, lat, lon) < 0.42) continue;
+        if (++n % 60 === 0) yield;
+        const k = Math.max(1, Math.round(coarse / edgeStep));
+        for (let a = 0; a < k; a++) {
+          for (let b = 0; b < k; b++) {
+            const x = cx - coarse / 2 + (a + r()) * (coarse / k);
+            const z = cz - coarse / 2 + (b + r()) * (coarse / k);
+            const f = forestDensity(x, z, lat, lon);
+            if (f < 0.5) continue;
+            const y = world.terrainHeight(x, z, probe);
+            const gap = probe.road;
+            if (gap < 9 || gap > 85 || y < W + 1.1) continue;
+            if (blocked(world, x, z, villages)) continue;
+            const edge = gap < 16;
+            const q = r();
+            let species;
+            if (edge) species = q < 0.55 ? 'bush' : north ? (q < 0.8 ? 'spruce' : 'birch') : q < 0.8 ? 'birch' : 'spruce';
+            else if (north) species = q < 0.45 ? 'spruce' : q < 0.75 ? 'pine' : q < 0.95 ? 'birch' : 'bush';
+            else if (south) species = q < 0.5 ? 'oak' : q < 0.7 ? 'maple' : q < 0.8 ? 'linden' : 'bush';
+            else species = q < 0.34 ? 'birch' : q < 0.6 ? 'spruce' : q < 0.74 ? 'pine' : q < 0.84 ? 'oak' : q < 0.9 ? 'linden' : 'bush';
+            list.push({ x, y, z, s: SPECIES_INDEX[species], scale: (edge ? 0.6 : 0.78) + r() * 0.5, rot: r() * Math.PI * 2 });
+          }
+        }
       }
     }
     // windbreak lines along highways in the steppe

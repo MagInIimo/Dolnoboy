@@ -63,7 +63,10 @@ export function* buildTerrain(world, x0, z0, size, step) {
       const fieldNoise = fbm(wx / 1500 + 7.1, wz / 1500 - 3.4, 2);
       const field = (1 - smoothstep(0.35, 0.5, forest)) * smoothstep(-0.15, 0.1, fieldNoise) * (1 - near) * (lat > 61 ? 0.2 : 1);
       const sand = 1 - smoothstep(W + 0.7, W + 1.6, h);
-      const shade = smoothstep(0.45, 0.62, forest) * (1 - near) * 0.75;
+      // forest floor (needles, leaf litter) right up to the forest edge; the first metres from a road stay a grass verge
+      const gapHere = R[(j + 1) * m + (i + 1)];
+      const nearCity = nearClutter(world, wx, wz, 1e9);
+      const shade = smoothstep(0.36, 0.5, forest) * (1 - nearCity) * smoothstep(9, 16, gapHere);
       put(i * step, h, j * step, nx, ny, nz, dry, field, sand, shade);
     }
     if (j % 16 === 15) yield;

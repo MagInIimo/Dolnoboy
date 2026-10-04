@@ -227,7 +227,12 @@ export class SurfaceMaterials {
         }
         vec3 sand = texture(uSurf, vec3(uvA, 8.0)).rgb;
         col = mix(col, sand, vBlend.z);
-        col *= 1.0 - 0.38 * vBlend.w;
+        // forest floor: dark litter of needles and leaves with moss patches
+        if (vBlend.w > 0.01) {
+          vec3 litter = mix(dryA * vec3(0.5, 0.42, 0.33), texture(uSurf, vec3(uvB * 1.7, 7.0)).rgb * vec3(0.55, 0.5, 0.42), 0.45);
+          litter = mix(litter, grassB * vec3(0.55, 0.62, 0.45), smoothstep(0.45, 0.75, macro2) * 0.6);
+          col = mix(col, litter, vBlend.w * 0.92);
+        }
         float slope = 1.0 - clamp(vWorldNormal.y, 0.0, 1.0);
         vec3 rock = texture(uSurf, vec3(uvB, 3.0)).rgb * vec3(0.95, 0.9, 0.85);
         col = mix(col, rock, smoothstep(0.28, 0.5, slope));
