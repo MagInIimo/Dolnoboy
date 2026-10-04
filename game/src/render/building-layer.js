@@ -270,6 +270,7 @@ export class BuildingLayer {
         if (b.fence) emitFence(gb, b.fence, b.seed);
       }
       for (const t of v.trees) if (inside(t.x, t.z)) trees.push(t);
+      for (const plot of v.plots ?? []) if (inside(plot.b.x, plot.b.z)) emitYard(gb, yard, plot);
       yield;
     }
     // lots: depots, fuel stations, services

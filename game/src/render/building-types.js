@@ -327,6 +327,14 @@ const TYPES = {
       localCylinder(gb, b, F_, u, -b.d / 4, base, 2.6, 1.6, 48 + r() * 30, 12, r() < 0.5 ? F.tvTower : F.factoryBrick, a);
     }
   },
+  banya(gb, b) {
+    const F_ = frame(b);
+    const a = attrsFor(b, b.tint);
+    prismWalls(gb, b, F_, 0, 0, b.w, b.d, b.y - 0.3, b.y + 2.3, F.logWall, 2.9, 2.6, a);
+    gableRoof(gb, b, F_, 0, 0, b.w, b.d, b.y + 2.3, 1.2, F.roofTin, F.woodFence, a, false, 0.35);
+    localBox(gb, b, F_, b.w / 2 - 0.8, b.y + 3.3, -0.6, 0.5, 1.6, 0.5, F.redBrick, a);
+    localBox(gb, b, F_, 0, b.y + 0.15, b.d / 2 + 0.7, b.w, 0.12, 1.4, F.woodFence, a);
+  },
   shed(gb, b) {
     const F_ = frame(b);
     const a = attrsFor(b, b.tint);
