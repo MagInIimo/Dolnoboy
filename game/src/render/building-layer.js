@@ -191,6 +191,7 @@ export class BuildingLayer {
     if (this.registered.has(key)) return;
     this.registered.add(key);
     for (const b of cb.list) this.collider(b);
+    for (const y of cb.yards) for (const c of y.cars) this.collider({ x: c.x, z: c.z, w: 1.9, d: 4.5, heading: c.heading, h: 1.6 }, 'car');
     for (const c of landmarkColliders(this.world, cb.city)) this.collider(c, 'landmark');
   }
 
@@ -230,6 +231,7 @@ export class BuildingLayer {
     marks.setOrigin(x0, 0, z0);
     const inside = (x, z) => x >= x0 && x < x0 + size && z >= z0 && z < z0 + size;
     const trees = [];
+    const parked = [];
     const models = [];
     // cities overlapping this chunk
     for (const c of this.world.cities) {
@@ -246,6 +248,11 @@ export class BuildingLayer {
         if (++n % 20 === 0) yield;
       }
       for (const t of cb.trees) if (inside(t.x, t.z)) trees.push(t);
+      for (const y of cb.yards) {
+        if (!inside(y.b.x, y.b.z)) continue;
+        emitYard(gb, yard, y);
+        for (const car of y.cars) parked.push(car);
+      }
       if (inside(c.x, c.z)) {
         emitLandmarks(lm, this.world, c, yard, models);
         yield;
@@ -273,6 +280,7 @@ export class BuildingLayer {
       for (const s of layoutLot(lot).structures) emitBuildingSimple(far, s);
     }
     chunk.cityTrees = trees;
+    chunk.parked = parked;
     const out = { meshes: [], near: [], far: [], cx: x0 + size / 2, cz: z0 + size / 2, isNear: true };
     const add = (builder, material, cast, group) => {
       const geo = builder.build();
@@ -357,6 +365,41 @@ export function fenceBox(gb, a, b, y, h, layer, seed, yb = null) {
   const ya = a.y ?? y ?? 0;
   const yy = yb ?? b.y ?? ya;
   gb.box((a.x + b.x) / 2, (ya + yy) / 2 + h / 2 - 0.2, (a.z + b.z) / 2, len, h + 0.4, 0.1, ang + Math.PI / 2, { aLayer: layer, aSeed: seed % 997, aTint: [1, 1, 1] }, 0.3);
+}
+
+// Courtyard surfaces (road material layers) and street furniture (building material).
+function emitYard(gb, yard, y) {
+  for (const s of y.surfaces) {
+    const ids = s.pts.map((p) => yard.vertex(p[0], s.y, p[1], 0, 1, 0, p[0] / 6, p[1] / 6, { aLayer: s.layer, aTint: s.tint }));
+    const [a, b, c] = s.pts;
+    const up = (b[1] - a[1]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[1] - a[1]);
+    if (up > 0) yard.quad(ids[0], ids[1], ids[2], ids[3]);
+    else yard.quad(ids[0], ids[3], ids[2], ids[1]);
+  }
+  const seed = y.b.seed % 997;
+  for (const p of y.props) {
+    const attrs = { aLayer: p.layer, aSeed: seed, aTint: p.tint };
+    if (p.t === 'box') gb.box(p.x, p.y, p.z, p.w, p.h, p.d, p.heading, attrs, 0.4);
+    else if (p.t === 'cyl') gb.cylinder(p.x, p.y, p.z, p.r0, p.r1, p.h, p.n, attrs, true, 1);
+    else if (p.t === 'slab') slab(gb, p.p0, p.p1, p.width, p.thick, attrs);
+  }
+}
+
+// Box between two points with a horizontal cross direction (a slide chute, a ramp).
+function slab(gb, p0, p1, width, thick, attrs) {
+  const dx = p1[0] - p0[0];
+  const dy = p1[1] - p0[1];
+  const dz = p1[2] - p0[2];
+  const l = Math.hypot(dx, dz) || 1;
+  const sx = (-dz / l) * (width / 2);
+  const sz = (dx / l) * (width / 2);
+  const up = [0, thick, 0];
+  const P = (q, s, k) => [q[0] + sx * s + up[0] * k, q[1] + up[1] * k, q[2] + sz * s + up[2] * k];
+  void dy;
+  gb.face(P(p0, -1, 1), P(p0, 1, 1), P(p1, 1, 1), P(p1, -1, 1), null, attrs);
+  gb.face(P(p0, 1, 0), P(p0, -1, 0), P(p1, -1, 0), P(p1, 1, 0), null, attrs);
+  gb.face(P(p0, 1, 0), P(p1, 1, 0), P(p1, 1, 1), P(p0, 1, 1), null, attrs);
+  gb.face(P(p1, -1, 0), P(p0, -1, 0), P(p0, -1, 1), P(p1, -1, 1), null, attrs);
 }
 
 function emitLot(gb, yard, marks, lot) {

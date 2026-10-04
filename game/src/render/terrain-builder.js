@@ -57,7 +57,8 @@ export function* buildTerrain(world, x0, z0, size, step) {
       nz /= l;
       const wx = x0 + i * step;
       const wz = z0 + j * step;
-      const dry = dryness(wx, wz, lat);
+      // town lawns are trampled and patchy
+      const dry = Math.min(1, dryness(wx, wz, lat) + nearClutter(world, wx, wz, 1e9) * (0.3 + 0.25 * fbm(wx / 37, wz / 37, 2)));
       const forest = forestDensity(wx, wz, lat, lon);
       const near = nearClutter(world, wx, wz, R[(j + 1) * m + (i + 1)]);
       const fieldNoise = fbm(wx / 1500 + 7.1, wz / 1500 - 3.4, 2);

@@ -6,6 +6,7 @@ import { BuildingLayer, buildingMaterial, facadeArray, loadFacadeImages } from '
 import { TreeSystem } from '../render/trees.js';
 import { Truck } from '../vehicle/truck.js';
 import { loadTruckAsset } from '../vehicle/truck-glb.js';
+import { ParkedCars } from '../render/parked-cars.js';
 import { loadCarModels, loadTruckLineup } from '../traffic/car-models.js';
 import { loadLandmarkModels } from '../render/landmark-models.js';
 import { buildTrailer } from '../vehicle/trailer-model.js';
@@ -66,7 +67,8 @@ export class Game {
     await L.frame();
     this.trees = new TreeSystem(engine, world, engine.quality, photos);
     this.props = new Props(engine, world, engine.quality, this.lang);
-    this.view = new WorldView(engine, world, this.surfaces, [this.buildings, this.trees, this.props]);
+    this.parked = new ParkedCars(engine, engine.quality);
+    this.view = new WorldView(engine, world, this.surfaces, [this.buildings, this.trees, this.props, this.parked]);
     this.truck = new Truck(engine, world);
     this.applyTruck();
     this.rig = new CameraRig(engine, this.truck, world);
@@ -1110,6 +1112,7 @@ export class Game {
       this.view.update(focus, this.running ? 4 : 8);
       this.horizon.update(focus);
       this.trees.update(dt, this.engine.camera.position);
+      this.parked.update(dt, this.engine.camera.position);
       this.buildings.update(this.engine.camera.position);
       this.props.update(dt, this.engine.camera.position, night);
       this.traffic.update(dt, this.engine.camera.position, night);

@@ -2,6 +2,7 @@ import { SpatialHash, hashString, obbOverlap, rng } from '../core/util.js';
 import { WATER_LEVEL } from '../core/geo.js';
 import { F } from '../render/facades.js';
 import { landmarkSites } from '../render/landmarks.js';
+import { layoutYards } from './yards.js';
 
 const W = WATER_LEVEL;
 
@@ -50,6 +51,7 @@ export class CityBuildings {
     this.city = city;
     this.list = [];
     this.trees = [];
+    this.yards = [];
     this.hash = new SpatialHash(64);
     this.done = false;
     this.random = rng(hashString(city.id) ^ 0xbeef);
@@ -173,7 +175,7 @@ export class CityBuildings {
           b.gap = dims.gap;
           if (this.fits(b, dims.gap)) {
             this.add(b);
-            if (onAvenue && zone !== 'fringe' && r() < 0.9) this.streetTrees(e, s, s + (dims.plot ? dims.plot[0] : dims.w), side);
+            if (zone !== 'fringe' && r() < (onAvenue ? 0.9 : 0.55)) this.streetTrees(e, s, s + (dims.plot ? dims.plot[0] : dims.w), side);
             s += (dims.plot ? dims.plot[0] : dims.w) + (zone === 'fringe' ? 2 + r() * 4 : dims.gap * (0.5 + r() * 0.6));
           } else s += 9;
           if (++work % 30 === 0) yield;
@@ -212,7 +214,7 @@ export class CityBuildings {
     }
     // 3) yard trees between buildings
     const area = Math.PI * maxR * maxR;
-    const want = Math.min(2600, Math.floor(area / 380));
+    const want = Math.min(6500, Math.floor(area / 260));
     for (let i = 0; i < want; i++) {
       const a = r() * Math.PI * 2;
       const rr = Math.sqrt(r()) * maxR;
@@ -241,6 +243,9 @@ export class CityBuildings {
       this.trees.push({ x, z, species, scale: 0.75 + r() * 0.5 });
       if (i % 200 === 0) yield;
     }
+    // 4) courtyards of the apartment blocks
+    this.yards = yield* layoutYards(this);
+    for (const y of this.yards) this.trees.push(...y.trees);
     this.done = true;
   }
 
